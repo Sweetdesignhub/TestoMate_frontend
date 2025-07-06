@@ -20,7 +20,7 @@ export default defineConfig({
           return path.replace(/^\/api\/jira/, "/rest/api/3");
         },
         secure: true,
-        logLevel: "debug", // Enable debug logging for proxy
+        logLevel: "debug",
       },
     },
   },

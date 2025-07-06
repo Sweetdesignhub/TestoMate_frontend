@@ -84,7 +84,7 @@ export const getProjectStories = async (projectKey) => {
       created: issue.fields.created,
       updated: issue.fields.updated,
       changelog: issue.changelog?.histories || [],
-      labels: issue.fields.labels || [], // Include labels
+      labels: issue.fields.labels || [],
     }));
     return {
       total: response.data.total,
@@ -107,6 +107,28 @@ export const getProjectStories = async (projectKey) => {
         "Forbidden: API token lacks permission to access stories."
       );
     }
+    throw error;
+  }
+};
+
+export const createJiraProject = async (projectData) => {
+  try {
+    const response = await axios.post(`${JIRA_BASE_URL}/project`, {
+      key: projectData.key,
+      name: projectData.name,
+      description: projectData.description || "",
+      projectTypeKey: "software",
+    });
+    return {
+      id: response.data.id,
+      key: response.data.key,
+      name: response.data.name,
+    };
+  } catch (error) {
+    console.error(
+      "Error creating project:",
+      error.response?.data || error.message
+    );
     throw error;
   }
 };
