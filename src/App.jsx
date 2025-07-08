@@ -30,6 +30,7 @@ import LoadingSpinner from "./components/LoadingSpinner";
 const Home = lazy(() => import("./pages/Home"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const RequirementsPage = lazy(() => import("./pages/RequirementsPage"));
+const Testing = lazy(() => import("./pages/Testing"));
 
 // Main application component with routing
 function App() {
@@ -40,6 +41,7 @@ function App() {
           <Route path="/home" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/requirements" element={<RequirementsPage />} />
+          <Route path="/testing" element={<Testing />} />
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </Suspense>
