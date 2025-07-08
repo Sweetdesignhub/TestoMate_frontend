@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { AiOutlineCloudUpload } from "react-icons/ai";
+import { AiOutlineCloudUpload, AiOutlineFile, AiOutlineClose } from "react-icons/ai";
 import { GrDocumentTest } from "react-icons/gr";
 import { getAllProjects, getProjectInfo } from "../utils/jiraApi";
 import { mainSidebarItems, projectSidebarItems } from "../utils/constants";
@@ -37,10 +37,12 @@ export default function RequirementsPage() {
   const [copiedTab, setCopiedTab] = useState(null);
   const [justSaved, setJustSaved] = useState({});
   const textareaRef = useRef(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]); // [{ name, content }]
+  const [selectedScriptLanguage, setSelectedScriptLanguage] = useState("Python");
+  const scriptLanguages = ["Python", "Java", "JavaScript", "C#"];
 
   const generationTabs = [
-    { name: "User Stories" },
-    { name: "Acceptance Criteria" },
+    { name: "User Stories & Acceptance Criteria" },
     { name: "Test Cases" },
     { name: "Automation Scripts" },
   ];
@@ -145,37 +147,33 @@ export default function RequirementsPage() {
 
   const handleGenerateTest = async () => {
     setError(null);
-    if (!prompt.trim()) {
-      setError("Please enter a requirement or story ID.");
+    setActiveGenerationTab('User Stories & Acceptance Criteria');
+    const filesContent = uploadedFiles.map(f => f.content).join("\n");
+    const requirement = (filesContent ? filesContent + "\n" : "") + prompt;
+    if (!requirement.trim()) {
+      setError("Please enter a requirement or story ID, or upload a file.");
       return;
     }
     const endpoints = {
-      "User Stories": {
+      "User Stories & Acceptance Criteria": {
         endpoint: "/jira_user_story",
-        payload: { requirement: prompt },
-      },
-      "Acceptance Criteria": {
-        endpoint: "/acceptance_criteria",
-        payload: { requirement: prompt },
+        payload: { requirement },
       },
       "Test Cases": {
         endpoint: "/test_cases",
-        payload: { requirement: prompt },
+        payload: { requirement },
       },
       "Automation Scripts": {
         endpoint: "/automation_script",
-        payload: { requirement: prompt, framework: "Selenium (Python)" },
+        payload: { requirement, languages: scriptLanguages },
       },
     };
-    // Set loading true for all
     setGenerationLoading({
-      "User Stories": true,
-      "Acceptance Criteria": true,
+      "User Stories & Acceptance Criteria": true,
       "Test Cases": true,
       "Automation Scripts": true,
     });
     setGenerationErrors({});
-    // Send all requests in parallel
     await Promise.all(
       Object.entries(endpoints).map(async ([tab, { endpoint, payload }]) => {
         try {
@@ -183,7 +181,13 @@ export default function RequirementsPage() {
             `http://localhost:8000${endpoint}`,
             payload
           );
-          setGenerationResults((prev) => ({ ...prev, [tab]: res.data.result }));
+          // For Automation Scripts, expect an object with all languages
+          if (tab === "Automation Scripts") {
+            setGenerationResults((prev) => ({ ...prev, [tab]: res.data.result }));
+            setSelectedScriptLanguage("Python"); // Default to Python after generation
+          } else {
+            setGenerationResults((prev) => ({ ...prev, [tab]: res.data.result }));
+          }
           setGenerationErrors((prev) => ({ ...prev, [tab]: undefined }));
         } catch (err) {
           setGenerationErrors((prev) => ({
@@ -222,37 +226,45 @@ export default function RequirementsPage() {
   // Helper to check if any generation is loading
   const isAnyGenerationLoading = Object.values(generationLoading).some(Boolean);
 
-  const handleUploadClick = () => {
-    if (fileInputRef.current) fileInputRef.current.value = null; // reset
-    fileInputRef.current?.click();
-  };
-
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
     const allowedTypes = [
       "text/plain",
       "text/markdown",
       "text/x-markdown",
       "application/octet-stream",
-    ]; // .txt, .md
-    if (
-      !allowedTypes.includes(file.type) &&
-      !file.name.endsWith(".md") &&
-      !file.name.endsWith(".txt")
-    ) {
-      setError("Unsupported file type. Please upload a .txt or .md file.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPrompt(event.target.result);
-      setError(null);
-    };
-    reader.onerror = () => {
-      setError("Failed to read file.");
-    };
-    reader.readAsText(file);
+    ];
+    let errorSet = false;
+    files.forEach((file) => {
+      if (!allowedTypes.includes(file.type) && !file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
+        setError("Unsupported file type. Please upload a .txt or .md file.");
+        errorSet = true;
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setUploadedFiles((prev) => {
+          // Avoid duplicate file names
+          if (prev.some(f => f.name === file.name)) return prev;
+          return [...prev, { name: file.name, content: event.target.result }];
+        });
+        setError(null);
+      };
+      reader.onerror = () => {
+        setError("Failed to read file.");
+        errorSet = true;
+      };
+      reader.readAsText(file);
+    });
+    if (!errorSet) setError(null);
+  };
+
+  const handleRemoveFile = (name) => setUploadedFiles((prev) => prev.filter(f => f.name !== name));
+
+  const handleUploadClick = () => {
+    if (fileInputRef.current) fileInputRef.current.value = null; // reset
+    fileInputRef.current?.click();
   };
 
   // Helper to render bold markdown (**text**) as <strong>text</strong>
@@ -374,6 +386,26 @@ export default function RequirementsPage() {
                   </div>
                 )}
 
+                {/* Uploaded file chips above input */}
+                {uploadedFiles.length > 0 && (
+                  <div className="mb-2 flex flex-wrap items-center gap-2 max-w-full">
+                    {uploadedFiles.map(file => (
+                      <div key={file.name} className="flex items-center bg-gray-100 border border-gray-300 rounded px-3 py-1 relative group max-w-xs overflow-hidden">
+                        <AiOutlineFile className="w-4 h-4 text-gray-500 mr-1" />
+                        <span className="truncate text-sm text-gray-800" title={file.name}>{file.name}</span>
+                        <button
+                          className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500"
+                          onClick={() => handleRemoveFile(file.name)}
+                          type="button"
+                          aria-label="Remove file"
+                        >
+                          <AiOutlineClose className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Prompt Input Card */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <div className="relative mb-6">
@@ -396,6 +428,7 @@ export default function RequirementsPage() {
                         ref={fileInputRef}
                         style={{ display: "none" }}
                         onChange={handleFileChange}
+                        multiple
                       />
                       <button
                         className="absolute top-2 right-3 flex items-center cursor-pointer gap-1 px-2 py-1 border border-black rounded text-gray-700 hover:text-gray-900 hover:bg-gray-100 text-sm bg-white"
@@ -425,7 +458,7 @@ export default function RequirementsPage() {
                 {/* Generation Tabs */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                   <div className="border-b border-gray-200">
-                    <nav className="flex space-x-8 px-6">
+                    <nav className="flex space-x-8 px-6 items-center">
                       {generationTabs.map((tab) => (
                         <button
                           key={tab.name}
@@ -439,6 +472,18 @@ export default function RequirementsPage() {
                           {tab.name}
                         </button>
                       ))}
+                      {activeGenerationTab === "Automation Scripts" && (
+                        <select
+                          value={selectedScriptLanguage}
+                          onChange={e => setSelectedScriptLanguage(e.target.value)}
+                          className="-ml-4 px-3 py-1.5 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-150 hover:border-blue-400 cursor-pointer"
+                          style={{ minWidth: 110 }}
+                        >
+                          {scriptLanguages.map(lang => (
+                            <option key={lang} value={lang}>{lang}</option>
+                          ))}
+                        </select>
+                      )}
                     </nav>
                   </div>
                   <div className="p-6">
@@ -451,46 +496,40 @@ export default function RequirementsPage() {
                         <div className="bg-red-100 text-red-700 p-4 rounded-lg">
                           {generationErrors[activeGenerationTab]}
                         </div>
+                      ) : activeGenerationTab === "Automation Scripts" ? (
+                        <div className="relative w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap" style={{ minHeight: "24rem" }}>
+                          {/* Copy button in top right */}
+                          <button
+                            className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 hover:text-blue-600 hover:bg-gray-200 text-xs font-medium transition-all"
+                            onClick={async () => {
+                              const script = generationResults["Automation Scripts"] && typeof generationResults["Automation Scripts"] === "object"
+                                ? (generationResults["Automation Scripts"][selectedScriptLanguage] || "")
+                                : "";
+                              if (script) {
+                                await navigator.clipboard.writeText(script);
+                                setCopiedTab("Automation Scripts");
+                                setTimeout(() => setCopiedTab(null), 1500);
+                              }
+                            }}
+                            type="button"
+                            aria-label="Copy script"
+                          >
+                            {copiedTab === "Automation Scripts" ? (
+                              <>
+                                <TiTick className="w-4 h-4 text-green-600" /> Copied!
+                              </>
+                            ) : (
+                              <>
+                                <MdContentCopy className="w-4 h-4" /> Copy
+                              </>
+                            )}
+                          </button>
+                          {/* Script content */}
+                          {generationResults["Automation Scripts"] && typeof generationResults["Automation Scripts"] === "object"
+                            ? (generationResults["Automation Scripts"][selectedScriptLanguage] || "No script generated for this language.")
+                            : "No automation scripts generated yet. Click 'Generate test' to create scripts."}
+                        </div>
                       ) : generationResults[activeGenerationTab] ? (
-                        // <div>
-                        //   {editMode[activeGenerationTab] ? (
-                        //     <textarea
-                        //       className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-gray-50 resize-none mb-2"
-                        //       value={editedResults[activeGenerationTab] || ""}
-                        //       onChange={(e) => handleEditResult(activeGenerationTab, e.target.value)}
-                        //       style={{ backgroundColor: '#fff' }}
-                        //     />
-                        //   ) : (
-                        //     <div
-                        //       className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-gray-50 mb-2 overflow-auto whitespace-pre-wrap"
-                        //       style={{ minHeight: '24rem' }}
-                        //       dangerouslySetInnerHTML={{ __html: renderBoldMarkdown(editedResults[activeGenerationTab]) }}
-                        //     />
-                        //   )}
-                        //   <div className="flex gap-2 mb-2 justify-end">
-                        //     <button
-                        //       className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
-                        //       onClick={() => handlePushToJira(activeGenerationTab)}
-                        //       type="button"
-                        //     >
-                        //       Push to Jira
-                        //     </button>
-                        //     <button
-                        //       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
-                        //       onClick={() => handleEditToggle(activeGenerationTab)}
-                        //       type="button"
-                        //     >
-                        //       {editMode[activeGenerationTab] ? 'Save' : 'Edit'}
-                        //     </button>
-                        //     <button
-                        //       className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm font-medium"
-                        //       onClick={() => handleCopy(activeGenerationTab)}
-                        //       type="button"
-                        //     >
-                        //       Copy
-                        //     </button>
-                        //   </div>
-                        // </div>
                         <div className="flex gap-4 mb-2">
                           {/* Left: Content area */}
                           <div className="flex-1">
@@ -518,7 +557,6 @@ export default function RequirementsPage() {
                               />
                             )}
                           </div>
-
                           {/* Right: Buttons */}
                           <div className="flex flex-col gap-2 justify-start">
                             <button
@@ -552,7 +590,6 @@ export default function RequirementsPage() {
                                 "Edit"
                               )}
                             </button>
-
                             <button
                               className="text-sm font-medium flex items-center cursor-pointer pl-8 gap-x-1 transition-all duration-300 ease-in-out"
                               onClick={() => handleCopy(activeGenerationTab)}
