@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { AiOutlineCloudUpload, AiTwotoneExperiment } from "react-icons/ai";
+import { AiOutlineCloudUpload } from "react-icons/ai";
 import { GrDocumentTest } from "react-icons/gr";
-import { getStoryInfo, getAllProjects, getProjectInfo } from "../utils/jiraApi";
+import { getAllProjects, getProjectInfo } from "../utils/jiraApi";
 import { mainSidebarItems, projectSidebarItems } from "../utils/constants";
 import Header from "../components/Header";
 import axios from "axios";
+import { CiEdit } from "react-icons/ci";
+import { MdContentCopy } from "react-icons/md";
+import { IoSaveOutline } from "react-icons/io5";
+import { TiTick } from "react-icons/ti";
 
 export default function RequirementsPage() {
   const navigate = useNavigate();
@@ -30,6 +34,9 @@ export default function RequirementsPage() {
   const [editedResults, setEditedResults] = useState({});
   const [editMode, setEditMode] = useState({});
   const fileInputRef = useRef(null);
+  const [copiedTab, setCopiedTab] = useState(null);
+  const [justSaved, setJustSaved] = useState({});
+  const textareaRef = useRef(null);
 
   const generationTabs = [
     { name: "User Stories" },
@@ -110,6 +117,8 @@ export default function RequirementsPage() {
   const handleCopy = async (tab) => {
     try {
       await navigator.clipboard.writeText(editedResults[tab] || "");
+      setCopiedTab(tab);
+      setTimeout(() => setCopiedTab(null), 1500);
     } catch (err) {
       alert("Failed to copy to clipboard");
     }
@@ -124,12 +133,13 @@ export default function RequirementsPage() {
     setEditMode((prev) => {
       const isEditing = prev[tab];
       if (isEditing) {
-        // Save mode: turn off edit mode
-        return { ...prev, [tab]: false };
-      } else {
-        // Edit mode: turn on edit mode
-        return { ...prev, [tab]: true };
+        // Just saved
+        setJustSaved((prevSaved) => ({ ...prevSaved, [tab]: true }));
+        setTimeout(() => {
+          setJustSaved((prevSaved) => ({ ...prevSaved, [tab]: false }));
+        }, 2000);
       }
+      return { ...prev, [tab]: !isEditing };
     });
   };
 
@@ -140,10 +150,22 @@ export default function RequirementsPage() {
       return;
     }
     const endpoints = {
-      "User Stories": { endpoint: "/jira_user_story", payload: { requirement: prompt } },
-      "Acceptance Criteria": { endpoint: "/acceptance_criteria", payload: { requirement: prompt } },
-      "Test Cases": { endpoint: "/test_cases", payload: { requirement: prompt } },
-      "Automation Scripts": { endpoint: "/automation_script", payload: { requirement: prompt, framework: "Selenium (Python)" } },
+      "User Stories": {
+        endpoint: "/jira_user_story",
+        payload: { requirement: prompt },
+      },
+      "Acceptance Criteria": {
+        endpoint: "/acceptance_criteria",
+        payload: { requirement: prompt },
+      },
+      "Test Cases": {
+        endpoint: "/test_cases",
+        payload: { requirement: prompt },
+      },
+      "Automation Scripts": {
+        endpoint: "/automation_script",
+        payload: { requirement: prompt, framework: "Selenium (Python)" },
+      },
     };
     // Set loading true for all
     setGenerationLoading({
@@ -157,19 +179,35 @@ export default function RequirementsPage() {
     await Promise.all(
       Object.entries(endpoints).map(async ([tab, { endpoint, payload }]) => {
         try {
-          const res = await axios.post(`http://localhost:8000${endpoint}`, payload);
+          const res = await axios.post(
+            `http://localhost:8000${endpoint}`,
+            payload
+          );
           setGenerationResults((prev) => ({ ...prev, [tab]: res.data.result }));
           setGenerationErrors((prev) => ({ ...prev, [tab]: undefined }));
         } catch (err) {
           setGenerationErrors((prev) => ({
             ...prev,
-            [tab]: err.response?.data?.detail || err.message || "Failed to generate result. Please try again.",
+            [tab]:
+              err.response?.data?.detail ||
+              err.message ||
+              "Failed to generate result. Please try again.",
           }));
         } finally {
           setGenerationLoading((prev) => ({ ...prev, [tab]: false }));
         }
       })
     );
+  };
+
+  const handlePromptChange = (e) => {
+    setPrompt(e.target.value);
+    setError(null);
+
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
   };
 
   useEffect(() => {
@@ -192,8 +230,17 @@ export default function RequirementsPage() {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const allowedTypes = ["text/plain", "text/markdown", "text/x-markdown", "application/octet-stream"]; // .txt, .md
-    if (!allowedTypes.includes(file.type) && !file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
+    const allowedTypes = [
+      "text/plain",
+      "text/markdown",
+      "text/x-markdown",
+      "application/octet-stream",
+    ]; // .txt, .md
+    if (
+      !allowedTypes.includes(file.type) &&
+      !file.name.endsWith(".md") &&
+      !file.name.endsWith(".txt")
+    ) {
       setError("Unsupported file type. Please upload a .txt or .md file.");
       return;
     }
@@ -210,9 +257,9 @@ export default function RequirementsPage() {
 
   // Helper to render bold markdown (**text**) as <strong>text</strong>
   function renderBoldMarkdown(text) {
-    if (!text) return '';
+    if (!text) return "";
     // Replace **text** with <strong>text</strong>
-    return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
   }
 
   return (
@@ -330,28 +377,28 @@ export default function RequirementsPage() {
                 {/* Prompt Input Card */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <div className="relative mb-6">
-                    <div className="border border-gray-300 rounded-lg pt-4 px-4 pb-2 bg-white">
+                    <div className="border border-gray-300 rounded-lg pt-4 px-4 pb-2 pr-24 bg-white">
                       <div className="absolute -top-3 left-4 bg-white px-1 text-sm font-medium text-gray-700">
                         Prompt
                       </div>
                       <textarea
+                        ref={textareaRef}
                         value={prompt}
-                        onChange={(e) => {
-                          setPrompt(e.target.value);
-                          setError(null);
-                        }}
+                        onChange={handlePromptChange}
                         placeholder="Enter a story ID (e.g., TES-123) or describe your requirements..."
-                        className="w-full h-16 border-none outline-none resize-none text-sm text-gray-700"
+                        className="w-full max-h-40 overflow-auto border-none outline-none resize-none text-sm text-gray-700 pr-4"
+                        style={{ minHeight: "3rem" }}
                       />
+
                       <input
                         type="file"
                         accept=".txt,.md,text/plain,text/markdown,text/x-markdown"
                         ref={fileInputRef}
-                        style={{ display: 'none' }}
+                        style={{ display: "none" }}
                         onChange={handleFileChange}
                       />
                       <button
-                        className="absolute top-2 right-3 flex items-center cursor-pointer gap-1 px-2 py-1 border border-black rounded text-gray-700 hover:text-gray-900 hover:bg-gray-100 text-sm"
+                        className="absolute top-2 right-3 flex items-center cursor-pointer gap-1 px-2 py-1 border border-black rounded text-gray-700 hover:text-gray-900 hover:bg-gray-100 text-sm bg-white"
                         onClick={handleUploadClick}
                         type="button"
                       >
@@ -360,11 +407,16 @@ export default function RequirementsPage() {
                       </button>
                     </div>
                   </div>
+
                   <button
                     onClick={handleGenerateTest}
                     className="w-full sm:w-auto px-4 py-2 bg-[#0089EB] cursor-pointer text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                     disabled={isAnyGenerationLoading}
-                    style={isAnyGenerationLoading ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                    style={
+                      isAnyGenerationLoading
+                        ? { opacity: 0.6, cursor: "not-allowed" }
+                        : {}
+                    }
                   >
                     Generate test
                   </button>
@@ -392,46 +444,136 @@ export default function RequirementsPage() {
                   <div className="p-6">
                     <div className="min-h-[400px]">
                       {generationLoading[activeGenerationTab] ? (
-                        <div className="flex items-center justify-center h-40 text-gray-500">Generating...</div>
+                        <div className="flex items-center justify-center h-40 text-gray-500">
+                          Generating...
+                        </div>
                       ) : generationErrors[activeGenerationTab] ? (
-                        <div className="bg-red-100 text-red-700 p-4 rounded-lg">{generationErrors[activeGenerationTab]}</div>
+                        <div className="bg-red-100 text-red-700 p-4 rounded-lg">
+                          {generationErrors[activeGenerationTab]}
+                        </div>
                       ) : generationResults[activeGenerationTab] ? (
-                        <div>
-                          {editMode[activeGenerationTab] ? (
-                            <textarea
-                              className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-gray-50 resize-none mb-2"
-                              value={editedResults[activeGenerationTab] || ""}
-                              onChange={(e) => handleEditResult(activeGenerationTab, e.target.value)}
-                              style={{ backgroundColor: '#fff' }}
-                            />
-                          ) : (
-                            <div
-                              className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-gray-50 mb-2 overflow-auto whitespace-pre-wrap"
-                              style={{ minHeight: '24rem' }}
-                              dangerouslySetInnerHTML={{ __html: renderBoldMarkdown(editedResults[activeGenerationTab]) }}
-                            />
-                          )}
-                          <div className="flex gap-2 mb-2 justify-end">
+                        // <div>
+                        //   {editMode[activeGenerationTab] ? (
+                        //     <textarea
+                        //       className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-gray-50 resize-none mb-2"
+                        //       value={editedResults[activeGenerationTab] || ""}
+                        //       onChange={(e) => handleEditResult(activeGenerationTab, e.target.value)}
+                        //       style={{ backgroundColor: '#fff' }}
+                        //     />
+                        //   ) : (
+                        //     <div
+                        //       className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-gray-50 mb-2 overflow-auto whitespace-pre-wrap"
+                        //       style={{ minHeight: '24rem' }}
+                        //       dangerouslySetInnerHTML={{ __html: renderBoldMarkdown(editedResults[activeGenerationTab]) }}
+                        //     />
+                        //   )}
+                        //   <div className="flex gap-2 mb-2 justify-end">
+                        //     <button
+                        //       className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
+                        //       onClick={() => handlePushToJira(activeGenerationTab)}
+                        //       type="button"
+                        //     >
+                        //       Push to Jira
+                        //     </button>
+                        //     <button
+                        //       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+                        //       onClick={() => handleEditToggle(activeGenerationTab)}
+                        //       type="button"
+                        //     >
+                        //       {editMode[activeGenerationTab] ? 'Save' : 'Edit'}
+                        //     </button>
+                        //     <button
+                        //       className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm font-medium"
+                        //       onClick={() => handleCopy(activeGenerationTab)}
+                        //       type="button"
+                        //     >
+                        //       Copy
+                        //     </button>
+                        //   </div>
+                        // </div>
+                        <div className="flex gap-4 mb-2">
+                          {/* Left: Content area */}
+                          <div className="flex-1">
+                            {editMode[activeGenerationTab] ? (
+                              <textarea
+                                className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-gray-50 resize-none"
+                                value={editedResults[activeGenerationTab] || ""}
+                                onChange={(e) =>
+                                  handleEditResult(
+                                    activeGenerationTab,
+                                    e.target.value
+                                  )
+                                }
+                                style={{ backgroundColor: "#fff" }}
+                              />
+                            ) : (
+                              <div
+                                className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap"
+                                style={{ minHeight: "24rem" }}
+                                dangerouslySetInnerHTML={{
+                                  __html: renderBoldMarkdown(
+                                    editedResults[activeGenerationTab]
+                                  ),
+                                }}
+                              />
+                            )}
+                          </div>
+
+                          {/* Right: Buttons */}
+                          <div className="flex flex-col gap-2 justify-start">
                             <button
-                              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
-                              onClick={() => handlePushToJira(activeGenerationTab)}
+                              className="px-4 py-2 bg-[#0089EB] cursor-pointer text-white rounded-lg hover:bg-[#007acc] text-sm font-medium"
+                              onClick={() =>
+                                handlePushToJira(activeGenerationTab)
+                              }
                               type="button"
                             >
                               Push to Jira
                             </button>
                             <button
-                              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
-                              onClick={() => handleEditToggle(activeGenerationTab)}
+                              className="text-sm font-medium flex cursor-pointer items-center pl-8 gap-x-1 transition-transform duration-150"
+                              onClick={() =>
+                                handleEditToggle(activeGenerationTab)
+                              }
                               type="button"
                             >
-                              {editMode[activeGenerationTab] ? 'Save' : 'Edit'}
+                              {editMode[activeGenerationTab] ? (
+                                <IoSaveOutline className="w-4 h-4" />
+                              ) : (
+                                <CiEdit className="w-4 h-4" />
+                              )}
+                              {justSaved[activeGenerationTab] ? (
+                                <span className="text-green-600 font-medium animate-pulse">
+                                  Saved
+                                </span>
+                              ) : editMode[activeGenerationTab] ? (
+                                "Save"
+                              ) : (
+                                "Edit"
+                              )}
                             </button>
+
                             <button
-                              className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm font-medium"
+                              className="text-sm font-medium flex items-center cursor-pointer pl-8 gap-x-1 transition-all duration-300 ease-in-out"
                               onClick={() => handleCopy(activeGenerationTab)}
                               type="button"
                             >
-                              Copy
+                              {copiedTab === activeGenerationTab ? (
+                                <TiTick className="w-4 h-4 text-green-600" />
+                              ) : (
+                                <MdContentCopy className="w-4 h-4" />
+                              )}
+                              <span
+                                className={`transition-all duration-300 ${
+                                  copiedTab === activeGenerationTab
+                                    ? "text-green-600"
+                                    : ""
+                                }`}
+                              >
+                                {copiedTab === activeGenerationTab
+                                  ? "Copied"
+                                  : "Copy"}
+                              </span>
                             </button>
                           </div>
                         </div>
@@ -441,7 +583,8 @@ export default function RequirementsPage() {
                             <GrDocumentTest className="w-8 h-8" />
                           </div>
                           <p className="text-sm">
-                            Generate {activeGenerationTab.toLowerCase()} by entering a story ID above
+                            Generate {activeGenerationTab.toLowerCase()} by
+                            entering a story ID above
                           </p>
                         </div>
                       )}
