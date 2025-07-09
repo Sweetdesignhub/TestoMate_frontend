@@ -40,6 +40,7 @@ export default function RequirementsPage() {
   const [uploadedFiles, setUploadedFiles] = useState([]); // [{ name, content }]
   const [selectedScriptLanguage, setSelectedScriptLanguage] = useState("Python");
   const scriptLanguages = ["Python", "Java", "JavaScript", "C#"];
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
   const generationTabs = [
     { name: "User Stories & Acceptance Criteria" },
@@ -146,12 +147,17 @@ export default function RequirementsPage() {
   };
 
   const handleGenerateTest = async () => {
+    setIsGeneratingAll(true);
+    setGenerationResults({}); // Clear previous results
+    setEditedResults({}); // Clear previous edits
     setError(null);
     setActiveGenerationTab('User Stories & Acceptance Criteria');
     const filesContent = uploadedFiles.map(f => f.content).join("\n");
     const requirement = (filesContent ? filesContent + "\n" : "") + prompt;
+    console.log("Prompt being sent:", prompt);
     if (!requirement.trim()) {
       setError("Please enter a requirement or story ID, or upload a file.");
+      setIsGeneratingAll(false);
       return;
     }
     const endpoints = {
@@ -181,12 +187,13 @@ export default function RequirementsPage() {
             `http://localhost:8000${endpoint}`,
             payload
           );
-          // For Automation Scripts, expect an object with all languages
           if (tab === "Automation Scripts") {
             setGenerationResults((prev) => ({ ...prev, [tab]: res.data.result }));
-            setSelectedScriptLanguage("Python"); // Default to Python after generation
+            setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
+            setSelectedScriptLanguage("Python");
           } else {
             setGenerationResults((prev) => ({ ...prev, [tab]: res.data.result }));
+            setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
           }
           setGenerationErrors((prev) => ({ ...prev, [tab]: undefined }));
         } catch (err) {
@@ -202,6 +209,7 @@ export default function RequirementsPage() {
         }
       })
     );
+    setIsGeneratingAll(false);
   };
 
   const handlePromptChange = (e) => {
@@ -241,7 +249,7 @@ export default function RequirementsPage() {
         setError("Unsupported file type. Please upload a .txt or .md file.");
         errorSet = true;
         return;
-      }
+      } 
       const reader = new FileReader();
       reader.onload = (event) => {
         setUploadedFiles((prev) => {
@@ -361,7 +369,13 @@ export default function RequirementsPage() {
                   ) : (
                     <select
                       value={selectedProject}
-                      onChange={(e) => setSelectedProject(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedProject(e.target.value);
+                        const selected = projects.find((p) => p.name === e.target.value);
+                        if (selected) {
+                          navigate("/requirements", { state: { projectKey: selected.key } });
+                        }
+                      }}
                       className="px-4 py-2 border border-gray-300 font-medium cursor-pointer rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       {projects.map((project) => (
@@ -444,9 +458,9 @@ export default function RequirementsPage() {
                   <button
                     onClick={handleGenerateTest}
                     className="w-full sm:w-auto px-4 py-2 bg-[#0089EB] cursor-pointer text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                    disabled={isAnyGenerationLoading}
+                    disabled={isAnyGenerationLoading || isGeneratingAll}
                     style={
-                      isAnyGenerationLoading
+                      isAnyGenerationLoading || isGeneratingAll
                         ? { opacity: 0.6, cursor: "not-allowed" }
                         : {}
                     }
@@ -488,7 +502,11 @@ export default function RequirementsPage() {
                   </div>
                   <div className="p-6">
                     <div className="min-h-[400px]">
-                      {generationLoading[activeGenerationTab] ? (
+                      {isGeneratingAll ? (
+                        <div className="flex items-center justify-center h-40 text-gray-500">
+                          Generating results, please wait...
+                        </div>
+                      ) : generationLoading[activeGenerationTab] ? (
                         <div className="flex items-center justify-center h-40 text-gray-500">
                           Generating...
                         </div>
