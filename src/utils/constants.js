@@ -32,7 +32,7 @@ export const projectSidebarItems = [
   { name: "Dashboard", icon: MdOutlineDashboard, path: "/dashboard" },
   { name: "Requirements", icon: MdChecklist, path: "/requirements" },
   { name: "Development", icon: FaLaptopCode, path: "/dashboard" },
-  { name: "Testing", icon: AiTwotoneExperiment, path: "/dashboard" },
+  { name: "Testing", icon: AiTwotoneExperiment, path: "/testing" },
   { name: "Support", icon: MdOutline3P, path: "/dashboard" },
   { name: "Release", icon: LuCircleFadingArrowUp, path: "/dashboard" },
 ];
