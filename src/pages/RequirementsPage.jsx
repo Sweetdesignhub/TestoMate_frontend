@@ -25,6 +25,9 @@ const debounce = (func, wait) => {
   };
 };
 
+// Add at the top of the file, outside the component
+const projectContentCache = {};
+
 export default function RequirementsPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -58,6 +61,27 @@ export default function RequirementsPage() {
     useState("Python");
   const scriptLanguages = ["Python", "Java", "JavaScript", "C#"];
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+
+  // Add new state for the four fields at the top of the component
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [acceptance, setAcceptance] = useState("");
+
+  // Add userStoryText state
+  const [userStoryText, setUserStoryText] = useState("");
+
+  // Add new state for the eleven fields at the top of the component
+  const [assignee, setAssignee] = useState("");
+  const [priority, setPriority] = useState("");
+  const [parent, setParent] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [labels, setLabels] = useState("");
+  const [team, setTeam] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [sprint, setSprint] = useState("");
+  const [storyPointEstimate, setStoryPointEstimate] = useState("");
+  const [developement, setDevelopement] = useState("");
+  const [reports, setReports] = useState("");
 
   const generationTabs = [
     { name: "User Stories & Acceptance Criteria" },
@@ -144,6 +168,8 @@ export default function RequirementsPage() {
       } else {
         title = content.split("\n")[0].substring(0, 100);
       }
+    } else if (typeof content === "object" && content.title) {
+      title = content.title.substring(0, 100);
     }
 
     try {
@@ -225,7 +251,7 @@ export default function RequirementsPage() {
 
   useEffect(() => {
     saveDraft();
-  }, [generationResults, projectKey]);
+  }, [generationResults["User Stories & Acceptance Criteria"], projectKey]);
 
   // Fetch history
   useEffect(() => {
@@ -241,6 +267,71 @@ export default function RequirementsPage() {
       }
     }
     fetchHistory();
+  }, [projectKey]);
+
+  // Save generated content to cache when it changes (but NOT on projectKey change)
+  useEffect(() => {
+    if (projectKey) {
+      if (!projectContentCache[projectKey]) projectContentCache[projectKey] = {};
+      if (generationResults["User Stories & Acceptance Criteria"]) {
+        projectContentCache[projectKey].userStory = JSON.stringify(generationResults["User Stories & Acceptance Criteria"]);
+      }
+      if (generationResults["Test Cases"]) {
+        projectContentCache[projectKey].testCases = JSON.stringify(generationResults["Test Cases"]);
+      }
+      if (generationResults["Automation Scripts"]) {
+        projectContentCache[projectKey].automation = JSON.stringify(generationResults["Automation Scripts"]);
+      }
+    }
+  }, [
+    generationResults["User Stories & Acceptance Criteria"],
+    generationResults["Test Cases"],
+    generationResults["Automation Scripts"]
+    // DO NOT include projectKey here!
+  ]);
+
+  // Restore or clear all sections on project change
+  useEffect(() => {
+    setTitle("");
+    setDescription("");
+    setAcceptance("");
+    setGenerationResults({
+      ["User Stories & Acceptance Criteria"]: undefined,
+      ["Test Cases"]: undefined,
+      ["Automation Scripts"]: undefined,
+    });
+
+    if (projectKey && projectContentCache[projectKey]) {
+      // User Stories
+      if (projectContentCache[projectKey].userStory) {
+        const parsed = JSON.parse(projectContentCache[projectKey].userStory);
+        setTitle(parsed.title || "");
+        setDescription(parsed.description || "");
+        setAcceptance(parsed.acceptance_criteria || "");
+        setAssignee(parsed.assignee || "");
+        setPriority(parsed.priority || "");
+        setParent(parsed.parent || "");
+        setDueDate(parsed.due_date || "");
+        setLabels(parsed.labels || "");
+        setTeam(parsed.team || "");
+        setStartDate(parsed.start_date || "");
+        setSprint(parsed.sprint || "");
+        setStoryPointEstimate(parsed.story_point_estimate || "");
+        setDevelopement(parsed.developement || "");
+        setReports(parsed.reports || "");
+      }
+      setGenerationResults({
+        ["User Stories & Acceptance Criteria"]: projectContentCache[projectKey].userStory
+          ? JSON.parse(projectContentCache[projectKey].userStory)
+          : undefined,
+        ["Test Cases"]: projectContentCache[projectKey].testCases
+          ? JSON.parse(projectContentCache[projectKey].testCases)
+          : undefined,
+        ["Automation Scripts"]: projectContentCache[projectKey].automation
+          ? JSON.parse(projectContentCache[projectKey].automation)
+          : undefined,
+      });
+    }
   }, [projectKey]);
 
   const handleEditResult = (tab, value) => {
@@ -261,9 +352,28 @@ export default function RequirementsPage() {
     }
   };
 
+  // When entering edit mode, combine fields into one string with extra space between each
   const handleEditToggle = (tab) => {
     setEditMode((prev) => {
       const isEditing = prev[tab];
+      if (!isEditing && tab === "User Stories & Acceptance Criteria") {
+        setUserStoryText(
+          `Title: ${title}\n\n` +
+          `Assignee: ${assignee}\n\n` +
+          `Priority: ${priority}\n\n` +
+          `Parent: ${parent}\n\n` +
+          `Due Date: ${dueDate}\n\n` +
+          `Labels: ${labels}\n\n` +
+          `Team: ${team}\n\n` +
+          `Start Date: ${startDate}\n\n` +
+          `Sprint: ${sprint}\n\n` +
+          `Story Point Estimate: ${storyPointEstimate}\n\n` +
+          `Development: ${developement}\n\n` +
+          `Reports: ${reports}\n\n` +
+          `Description: ${description}\n\n` +
+          `Acceptance Criteria: ${acceptance}`
+        );
+      }
       if (isEditing) {
         setJustSaved((prevSaved) => ({ ...prevSaved, [tab]: true }));
         setTimeout(() => {
@@ -272,6 +382,40 @@ export default function RequirementsPage() {
       }
       return { ...prev, [tab]: !isEditing };
     });
+  };
+
+  // When saving, parse the textarea content back into fields
+  const handleSaveUserStory = () => {
+    // Use regex to extract each section (allow for extra blank lines)
+    const titleMatch = userStoryText.match(/Title:\s*([\s\S]*?)\n\nAssignee:/);
+    const assigneeMatch = userStoryText.match(/Assignee:\s*([\s\S]*?)\n\nPriority:/);
+    const priorityMatch = userStoryText.match(/Priority:\s*([\s\S]*?)\n\nParent:/);
+    const parentMatch = userStoryText.match(/Parent:\s*([\s\S]*?)\n\nDue Date:/);
+    const dueDateMatch = userStoryText.match(/Due Date:\s*([\s\S]*?)\n\nLabels:/);
+    const labelsMatch = userStoryText.match(/Labels:\s*([\s\S]*?)\n\nTeam:/);
+    const teamMatch = userStoryText.match(/Team:\s*([\s\S]*?)\n\nStart Date:/);
+    const startDateMatch = userStoryText.match(/Start Date:\s*([\s\S]*?)\n\nSprint:/);
+    const sprintMatch = userStoryText.match(/Sprint:\s*([\s\S]*?)\n\nStory Point Estimate:/);
+    const storyPointEstimateMatch = userStoryText.match(/Story Point Estimate:\s*([\s\S]*?)\n\nDevelopment:/);
+    const developementMatch = userStoryText.match(/Development:\s*([\s\S]*?)\n\nReports:/);
+    const reportsMatch = userStoryText.match(/Reports:\s*([\s\S]*?)\n\nDescription:/);
+    const descriptionMatch = userStoryText.match(/Description:\s*([\s\S]*?)\n\nAcceptance Criteria:/);
+    const acceptanceMatch = userStoryText.match(/Acceptance Criteria:\s*([\s\S]*)/);
+    setTitle(titleMatch ? titleMatch[1].trim() : "");
+    setAssignee(assigneeMatch ? assigneeMatch[1].trim() : "");
+    setPriority(priorityMatch ? priorityMatch[1].trim() : "");
+    setParent(parentMatch ? parentMatch[1].trim() : "");
+    setDueDate(dueDateMatch ? dueDateMatch[1].trim() : "");
+    setLabels(labelsMatch ? labelsMatch[1].trim() : "");
+    setTeam(teamMatch ? teamMatch[1].trim() : "");
+    setStartDate(startDateMatch ? startDateMatch[1].trim() : "");
+    setSprint(sprintMatch ? sprintMatch[1].trim() : "");
+    setStoryPointEstimate(storyPointEstimateMatch ? storyPointEstimateMatch[1].trim() : "");
+    setDevelopement(developementMatch ? developementMatch[1].trim() : "");
+    setReports(reportsMatch ? reportsMatch[1].trim() : "");
+    setDescription(descriptionMatch ? descriptionMatch[1].trim() : "");
+    setAcceptance(acceptanceMatch ? acceptanceMatch[1].trim() : "");
+    setEditMode((prev) => ({ ...prev, ["User Stories & Acceptance Criteria"]: false }));
   };
 
   const handleGenerateTest = async () => {
@@ -321,17 +465,29 @@ export default function RequirementsPage() {
               [tab]: res.data.result,
             }));
             setSelectedScriptLanguage("Python");
-            setGenerationResults((prev) => ({
-              ...prev,
-              [tab]: res.data.result,
-            }));
             setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
             setSelectedScriptLanguage("Python");
-          } else {
+          } else if (tab === "User Stories & Acceptance Criteria") {
+            setTitle(res.data.title || "");
+            setDescription(res.data.description || "");
+            setAcceptance(res.data.acceptance_criteria || "");
+            setAssignee(res.data.assignee || "");
+            setPriority(res.data.priority || "");
+            setParent(res.data.parent || "");
+            setDueDate(res.data.due_date || "");
+            setLabels(res.data.labels || "");
+            setTeam(res.data.team || "");
+            setStartDate(res.data.start_date || "");
+            setSprint(res.data.sprint || "");
+            setStoryPointEstimate(res.data.story_point_estimate || "");
+            setDevelopement(res.data.developement || "");
+            setReports(res.data.reports || "");
             setGenerationResults((prev) => ({
               ...prev,
-              [tab]: res.data.result,
+              [tab]: res.data,
             }));
+            setEditedResults((prev) => ({ ...prev, [tab]: res.data }));
+          } else {
             setGenerationResults((prev) => ({
               ...prev,
               [tab]: res.data.result,
@@ -681,90 +837,39 @@ export default function RequirementsPage() {
                           <div className="bg-red-100 text-red-700 p-4 rounded-lg">
                             {generationErrors[activeGenerationTab]}
                           </div>
-                        ) : activeGenerationTab === "Automation Scripts" ? (
-                          <div
-                            className="relative w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap"
-                            style={{ minHeight: "24rem" }}
-                          >
-                            {/* Copy button in top right */}
-                            <button
-                              className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 hover:text-blue-600 hover:bg-gray-200 text-xs font-medium transition-all"
-                              onClick={async () => {
-                                const script =
-                                  generationResults["Automation Scripts"] &&
-                                  typeof generationResults[
-                                    "Automation Scripts"
-                                  ] === "object"
-                                    ? generationResults["Automation Scripts"][
-                                        selectedScriptLanguage
-                                      ] || ""
-                                    : "";
-                                if (script) {
-                                  await navigator.clipboard.writeText(script);
-                                  setCopiedTab("Automation Scripts");
-                                  setTimeout(() => setCopiedTab(null), 1500);
-                                }
-                              }}
-                              type="button"
-                              aria-label="Copy script"
-                            >
-                              {copiedTab === "Automation Scripts" ? (
-                                <>
-                                  <TiTick className="w-4 h-4 text-green-600" />{" "}
-                                  Copied!
-                                </>
-                              ) : (
-                                <>
-                                  <MdContentCopy className="w-4 h-4" /> Copy
-                                </>
-                              )}
-                            </button>
-                            {/* Script content */}
-                            {generationResults["Automation Scripts"] &&
-                            typeof generationResults["Automation Scripts"] ===
-                              "object"
-                              ? generationResults["Automation Scripts"][
-                                  selectedScriptLanguage
-                                ] || "No script generated for this language."
-                              : "No automation scripts generated yet. Click 'Generate test' to create scripts."}
-                          </div>
-                        ) : generationResults[activeGenerationTab] ? (
+                        ) : activeGenerationTab === "User Stories & Acceptance Criteria" && generationResults[activeGenerationTab] ? (
                           <div className="flex gap-4 mb-2">
-                            {/* Left: Content area */}
                             <div className="flex-1">
                               {editMode[activeGenerationTab] ? (
                                 <textarea
-                                  className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-gray-50 resize-none"
-                                  value={
-                                    editedResults[activeGenerationTab] || ""
-                                  }
-                                  onChange={(e) =>
-                                    handleEditResult(
-                                      activeGenerationTab,
-                                      e.target.value
-                                    )
-                                  }
-                                  style={{ backgroundColor: "#fff" }}
+                                  className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-white resize-none"
+                                  value={userStoryText}
+                                  onChange={e => setUserStoryText(e.target.value)}
+                                  style={{ backgroundColor: "#fff", minHeight: "24rem" }}
                                 />
                               ) : (
-                                <div
-                                  className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap"
-                                  style={{ minHeight: "24rem" }}
-                                  dangerouslySetInnerHTML={{
-                                    __html: renderBoldMarkdown(
-                                      editedResults[activeGenerationTab]
-                                    ),
-                                  }}
-                                />
+                                <div className="space-y-4">
+                                  <div><strong>Title</strong><br /><span style={{ whiteSpace: 'pre-line' }}>{title}</span></div>
+                                  <div><strong>Assignee:</strong> <span style={{ whiteSpace: 'pre-line' }}>{assignee}</span></div>
+                                  <div><strong>Priority:</strong> <span style={{ whiteSpace: 'pre-line' }}>{priority}</span></div>
+                                  <div><strong>Parent:</strong> <span style={{ whiteSpace: 'pre-line' }}>{parent}</span></div>
+                                  <div><strong>Due Date:</strong> <span style={{ whiteSpace: 'pre-line' }}>{dueDate}</span></div>
+                                  <div><strong>Labels:</strong> <span style={{ whiteSpace: 'pre-line' }}>{labels}</span></div>
+                                  <div><strong>Team:</strong> <span style={{ whiteSpace: 'pre-line' }}>{team}</span></div>
+                                  <div><strong>Start Date:</strong> <span style={{ whiteSpace: 'pre-line' }}>{startDate}</span></div>
+                                  <div><strong>Sprint:</strong> <span style={{ whiteSpace: 'pre-line' }}>{sprint}</span></div>
+                                  <div><strong>Story Point Estimate:</strong> <span style={{ whiteSpace: 'pre-line' }}>{storyPointEstimate}</span></div>
+                                  <div><strong>Development:</strong> <span style={{ whiteSpace: 'pre-line' }}>{developement}</span></div>
+                                  <div><strong>Reports:</strong> <span style={{ whiteSpace: 'pre-line' }}>{reports}</span></div>
+                                  <div><strong>Description</strong><br /><span style={{ whiteSpace: 'pre-line' }}>{description}</span></div>
+                                  <div><strong>Acceptance criteria</strong><br /><span style={{ whiteSpace: 'pre-line' }}>{acceptance}</span></div>
+                                </div>
                               )}
                             </div>
-                            {/* Right: Buttons */}
                             <div className="flex flex-col gap-2 justify-start">
                               <button
                                 className="px-4 py-2 bg-[#0089EB] cursor-pointer text-white rounded-lg hover:bg-[#007acc] text-sm font-medium"
-                                onClick={() =>
-                                  handlePushToJira(activeGenerationTab)
-                                }
+                                onClick={() => handlePushToJira(activeGenerationTab)}
                                 type="button"
                               >
                                 Push to Jira
@@ -772,7 +877,9 @@ export default function RequirementsPage() {
                               <button
                                 className="text-sm font-medium flex cursor-pointer items-center pl-8 gap-x-1 transition-transform duration-150"
                                 onClick={() =>
-                                  handleEditToggle(activeGenerationTab)
+                                  editMode[activeGenerationTab]
+                                    ? handleSaveUserStory()
+                                    : handleEditToggle(activeGenerationTab)
                                 }
                                 type="button"
                               >
@@ -781,15 +888,7 @@ export default function RequirementsPage() {
                                 ) : (
                                   <CiEdit className="w-4 h-4" />
                                 )}
-                                {justSaved[activeGenerationTab] ? (
-                                  <span className="text-green-600 font-medium animate-pulse">
-                                    Saved
-                                  </span>
-                                ) : editMode[activeGenerationTab] ? (
-                                  "Save"
-                                ) : (
-                                  "Edit"
-                                )}
+                                {editMode[activeGenerationTab] ? "Save" : "Edit"}
                               </button>
                               <button
                                 className="text-sm font-medium flex items-center cursor-pointer pl-8 gap-x-1 transition-all duration-300 ease-in-out"
@@ -802,18 +901,70 @@ export default function RequirementsPage() {
                                   <MdContentCopy className="w-4 h-4" />
                                 )}
                                 <span
-                                  className={`transition-all duration-300 ${
-                                    copiedTab === activeGenerationTab
-                                      ? "text-green-600"
-                                      : ""
-                                  }`}
+                                  className={`transition-all duration-300 ${copiedTab === activeGenerationTab ? "text-green-600" : ""}`}
                                 >
-                                  {copiedTab === activeGenerationTab
-                                    ? "Copied"
-                                    : "Copy"}
+                                  {copiedTab === activeGenerationTab ? "Copied" : "Copy"}
                                 </span>
                               </button>
                             </div>
+                          </div>
+                        ) : activeGenerationTab === "Test Cases" && generationResults["Test Cases"] ? (
+                          <div className="flex gap-4 mb-2">
+                            <div className="flex-1">
+                              <div className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap" style={{ minHeight: "24rem" }}>
+                                {generationResults["Test Cases"]}
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-2 justify-start">
+                              <button
+                                className="text-sm font-medium flex items-center cursor-pointer pl-8 gap-x-1 transition-all duration-300 ease-in-out"
+                                onClick={() => handleCopy("Test Cases")}
+                                type="button"
+                              >
+                                {copiedTab === "Test Cases" ? (
+                                  <TiTick className="w-4 h-4 text-green-600" />
+                                ) : (
+                                  <MdContentCopy className="w-4 h-4" />
+                                )}
+                                <span className={`transition-all duration-300 ${copiedTab === "Test Cases" ? "text-green-600" : ""}`}>
+                                  {copiedTab === "Test Cases" ? "Copied" : "Copy"}
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : activeGenerationTab === "Automation Scripts" && generationResults["Automation Scripts"] ? (
+                          <div className="relative w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap" style={{ minHeight: "24rem" }}>
+                            <button
+                              className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 hover:text-blue-600 hover:bg-gray-200 text-xs font-medium transition-all"
+                              onClick={async () => {
+                                const script =
+                                  generationResults["Automation Scripts"] &&
+                                  typeof generationResults["Automation Scripts"] === "object"
+                                    ? generationResults["Automation Scripts"][selectedScriptLanguage] || ""
+                                    : "";
+                                if (script) {
+                                  await navigator.clipboard.writeText(script);
+                                  setCopiedTab("Automation Scripts");
+                                  setTimeout(() => setCopiedTab(null), 1500);
+                                }
+                              }}
+                              type="button"
+                              aria-label="Copy script"
+                            >
+                              {copiedTab === "Automation Scripts" ? (
+                                <>
+                                  <TiTick className="w-4 h-4 text-green-600" /> Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <MdContentCopy className="w-4 h-4" /> Copy
+                                </>
+                              )}
+                            </button>
+                            {generationResults["Automation Scripts"] &&
+                            typeof generationResults["Automation Scripts"] === "object"
+                              ? generationResults["Automation Scripts"][selectedScriptLanguage] || "No script generated for this language."
+                              : "No automation scripts generated yet. Click 'Generate test' to create scripts."}
                           </div>
                         ) : (
                           <div className="min-h-[400px] flex items-center justify-center">
