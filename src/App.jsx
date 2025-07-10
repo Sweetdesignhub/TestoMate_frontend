@@ -25,6 +25,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import LoadingSpinner from "./components/LoadingSpinner";
+import HistoryPage from "./pages/History";
 
 // Lazy-loaded components
 const Home = lazy(() => import("./pages/Home"));
@@ -41,6 +42,7 @@ function App() {
           <Route path="/home" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/requirements" element={<RequirementsPage />} />
+          <Route path="/history" element={<HistoryPage />} />
           <Route path="/testing" element={<Testing />} />
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>

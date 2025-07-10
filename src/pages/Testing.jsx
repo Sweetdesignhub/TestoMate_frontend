@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import {
-  Search,
-  Edit3,
-  Download,
-  RefreshCw,
-} from "lucide-react";
+import { Search, Edit3, Download, RefreshCw } from "lucide-react";
 import { mainSidebarItems, projectSidebarItems } from "../utils/constants";
 import Header from "../components/Header";
 
@@ -31,7 +26,7 @@ const Testing = () => {
       duration: "16m 36s",
       date: "10.04.2020, 12:45",
       hasDownload: true,
-      hasRefresh: false
+      hasRefresh: false,
     },
     {
       id: 2,
@@ -42,7 +37,7 @@ const Testing = () => {
       duration: "8m 22s",
       date: "09.04.2020, 14:30",
       hasDownload: false,
-      hasRefresh: true
+      hasRefresh: true,
     },
     {
       id: 3,
@@ -53,7 +48,7 @@ const Testing = () => {
       duration: "5m 12s",
       date: "08.04.2020, 09:15",
       hasDownload: true,
-      hasRefresh: false
+      hasRefresh: false,
     },
     {
       id: 4,
@@ -64,7 +59,7 @@ const Testing = () => {
       duration: "12m 48s",
       date: "07.04.2020, 16:20",
       hasDownload: false,
-      hasRefresh: true
+      hasRefresh: true,
     },
     {
       id: 5,
@@ -75,7 +70,7 @@ const Testing = () => {
       duration: "25m 14s",
       date: "06.04.2020, 11:10",
       hasDownload: true,
-      hasRefresh: false
+      hasRefresh: false,
     },
     {
       id: 6,
@@ -86,7 +81,7 @@ const Testing = () => {
       duration: "18m 05s",
       date: "05.04.2020, 13:25",
       hasDownload: false,
-      hasRefresh: true
+      hasRefresh: true,
     },
     {
       id: 7,
@@ -97,7 +92,7 @@ const Testing = () => {
       duration: "9m 42s",
       date: "04.04.2020, 10:15",
       hasDownload: true,
-      hasRefresh: false
+      hasRefresh: false,
     },
     {
       id: 8,
@@ -108,7 +103,7 @@ const Testing = () => {
       duration: "22m 18s",
       date: "03.04.2020, 15:30",
       hasDownload: false,
-      hasRefresh: true
+      hasRefresh: true,
     },
     {
       id: 9,
@@ -119,7 +114,7 @@ const Testing = () => {
       duration: "14m 55s",
       date: "02.04.2020, 08:45",
       hasDownload: true,
-      hasRefresh: false
+      hasRefresh: false,
     },
     {
       id: 10,
@@ -130,29 +125,29 @@ const Testing = () => {
       duration: "7m 33s",
       date: "01.04.2020, 17:20",
       hasDownload: false,
-      hasRefresh: true
-    }
+      hasRefresh: true,
+    },
   ];
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'completed':
-        return 'text-green-600';
-      case 'failed':
-        return 'text-red-600';
-      case 'disabled':
-        return 'text-gray-500';
-      case 'in-progress':
-        return 'text-cyan-600';
+      case "completed":
+        return "text-green-600";
+      case "failed":
+        return "text-red-600";
+      case "disabled":
+        return "text-gray-500";
+      case "in-progress":
+        return "text-cyan-600";
       default:
-        return 'text-gray-600';
+        return "text-gray-600";
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'in-progress':
-        return 'In progress';
+      case "in-progress":
+        return "In progress";
       default:
         return status;
     }
@@ -220,7 +215,15 @@ const Testing = () => {
                   Home
                 </Link>
                 <span className="mx-2">/</span>
-                <span className="text-red-600 font-medium">{projectName}</span>
+                <Link
+                  to="/dashboard"
+                  state={{ projectKey }}
+                  className="font-medium text-[#343434] cursor-pointer"
+                >
+                  {projectName}
+                </Link>
+                <span className="mx-2">/</span>
+                <span className="text-red-600 font-medium">All Tests</span>
               </div>
 
               <h1 className="text-3xl text-gray-900 mb-8 font-['Johnson', 'sans-serif']">
@@ -331,8 +334,18 @@ const Testing = () => {
                         Test type
                       </label>
                       <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        <svg
+                          className="w-4 h-4 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
                         </svg>
                       </div>
                     </div>
@@ -349,8 +362,18 @@ const Testing = () => {
                         Environment
                       </label>
                       <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        <svg
+                          className="w-4 h-4 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
                         </svg>
                       </div>
                     </div>
@@ -368,8 +391,18 @@ const Testing = () => {
                         Linked Module
                       </label>
                       <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        <svg
+                          className="w-4 h-4 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
                         </svg>
                       </div>
                     </div>
@@ -387,8 +420,18 @@ const Testing = () => {
                         Select Tests
                       </label>
                       <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        <svg
+                          className="w-4 h-4 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
                         </svg>
                       </div>
                     </div>
@@ -447,18 +490,33 @@ const Testing = () => {
                   <table className="w-full font-['Inter',sans-serif]">
                     <thead className="sticky top-0 z-10">
                       <tr className="border-b border-gray-200 bg-gray-50">
-                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">Test Name</th>
-                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">Type</th>
-                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">Status</th>
-                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">Executed by</th>
-                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">Duration</th>
-                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">Date</th>
+                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">
+                          Test Name
+                        </th>
+                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">
+                          Type
+                        </th>
+                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">
+                          Status
+                        </th>
+                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">
+                          Executed by
+                        </th>
+                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">
+                          Duration
+                        </th>
+                        <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]">
+                          Date
+                        </th>
                         <th className="text-left text-sm font-semibold text-gray-900 py-4 px-6 font-['Inter',sans-serif]"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {testData.map((test) => (
-                        <tr key={test.id} className="hover:bg-cyan-50 transition-colors">
+                        <tr
+                          key={test.id}
+                          className="hover:bg-cyan-50 transition-colors"
+                        >
                           <td className="py-4 px-6 text-sm text-gray-600 font-['Inter',sans-serif]">
                             {test.testName}
                           </td>
@@ -466,7 +524,11 @@ const Testing = () => {
                             {test.type}
                           </td>
                           <td className="py-4 px-6">
-                            <span className={`px-3 py-1 rounded-full font-semibold text-xs font-large capitalize font-['Inter',sans-serif] ${getStatusColor(test.status)}`}>
+                            <span
+                              className={`px-3 py-1 rounded-full font-semibold text-xs font-large capitalize font-['Inter',sans-serif] ${getStatusColor(
+                                test.status
+                              )}`}
+                            >
                               {getStatusText(test.status)}
                             </span>
                           </td>
@@ -482,26 +544,20 @@ const Testing = () => {
                           <td className="py-4 px-6">
                             <div className="flex items-center space-x-3">
                               {/* Edit Icon - Always present */}
-                              <button 
-                                className="transition-all duration-200 rounded p-1 text-[#000098] hover:bg-[rgba(0,0,152,0.1)]"
-                              >
+                              <button className="transition-all duration-200 rounded p-1 text-[#000098] hover:bg-[rgba(0,0,152,0.1)]">
                                 <Edit3 className="w-4 h-4" />
                               </button>
-                              
+
                               {/* Download Icon */}
                               {test.hasDownload && (
-                                <button 
-                                  className="transition-all duration-200 rounded p-1 text-[#000098] hover:bg-[rgba(0,0,152,0.1)]"
-                                >
+                                <button className="transition-all duration-200 rounded p-1 text-[#000098] hover:bg-[rgba(0,0,152,0.1)]">
                                   <Download className="w-4 h-4" />
                                 </button>
                               )}
-                              
+
                               {/* Refresh Icon */}
                               {test.hasRefresh && (
-                                <button 
-                                  className="transition-all duration-200 rounded p-1 text-[#000098] hover:bg-[rgba(0,0,152,0.1)]"
-                                >
+                                <button className="transition-all duration-200 rounded p-1 text-[#000098] hover:bg-[rgba(0,0,152,0.1)]">
                                   <RefreshCw className="w-4 h-4" />
                                 </button>
                               )}

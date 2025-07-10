@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { AiOutlineCloudUpload, AiOutlineFile, AiOutlineClose } from "react-icons/ai";
+import {
+  AiOutlineCloudUpload,
+  AiOutlineFile,
+  AiOutlineClose,
+} from "react-icons/ai";
 import { GrDocumentTest } from "react-icons/gr";
 import { getAllProjects, getProjectInfo } from "../utils/jiraApi";
 import { mainSidebarItems, projectSidebarItems } from "../utils/constants";
@@ -10,20 +14,31 @@ import { CiEdit } from "react-icons/ci";
 import { MdContentCopy } from "react-icons/md";
 import { IoSaveOutline } from "react-icons/io5";
 import { TiTick } from "react-icons/ti";
+import ErrorBoundary from "../components/ErrorBoundary";
+
+// Debounce function to limit API calls
+const debounce = (func, wait) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
 
 export default function RequirementsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeMainTab, setActiveMainTab] = useState("Generative Agent");
   const [activeSubTab, setActiveSubTab] = useState("Requirements");
-  const [activeGenerationTab, setActiveGenerationTab] =
-    useState("User Stories");
+  const [activeGenerationTab, setActiveGenerationTab] = useState(
+    "User Stories & Acceptance Criteria"
+  );
   const [prompt, setPrompt] = useState("");
   const [selectedProject, setSelectedProject] = useState("");
   const [projectKey, setProjectKey] = useState(
     location.state?.projectKey || "Unknown Project"
   );
-  const [projectName, setProjectName] = useState(projectKey); // Initialize with projectKey as fallback
+  const [projectName, setProjectName] = useState(projectKey);
   const [projects, setProjects] = useState([]);
   const [storyData, setStoryData] = useState(null);
   const [error, setError] = useState(null);
@@ -33,12 +48,14 @@ export default function RequirementsPage() {
   const [generationErrors, setGenerationErrors] = useState({});
   const [editedResults, setEditedResults] = useState({});
   const [editMode, setEditMode] = useState({});
+  const [history, setHistory] = useState([]);
   const fileInputRef = useRef(null);
   const [copiedTab, setCopiedTab] = useState(null);
   const [justSaved, setJustSaved] = useState({});
   const textareaRef = useRef(null);
-  const [uploadedFiles, setUploadedFiles] = useState([]); // [{ name, content }]
-  const [selectedScriptLanguage, setSelectedScriptLanguage] = useState("Python");
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [selectedScriptLanguage, setSelectedScriptLanguage] =
+    useState("Python");
   const scriptLanguages = ["Python", "Java", "JavaScript", "C#"];
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
@@ -54,7 +71,6 @@ export default function RequirementsPage() {
       try {
         const allProjects = await getAllProjects();
         setProjects(allProjects);
-        // Set the initial selected project to the one from location.state or the first project
         if (allProjects.length > 0) {
           const initialProject =
             allProjects.find((p) => p.key === projectKey) || allProjects[0];
@@ -81,11 +97,12 @@ export default function RequirementsPage() {
       try {
         if (projectKey !== "Unknown Project") {
           const projectInfo = await getProjectInfo(projectKey);
+          console.log("Valid issue types for project:", projectInfo.issueTypes);
           setProjectName(projectInfo.name);
         }
       } catch (error) {
         console.error("Failed to fetch project name:", error.message);
-        setProjectName(projectKey); // Fallback to projectKey if fetching fails
+        setProjectName(projectKey);
         setError("Failed to fetch project name from Jira.");
       }
     }
@@ -104,7 +121,6 @@ export default function RequirementsPage() {
   useEffect(() => {
     Object.entries(generationResults).forEach(([tab, result]) => {
       setEditedResults((prev) => {
-        // Only set if not already edited (preserve user edits)
         if (prev[tab] === undefined) {
           return { ...prev, [tab]: result };
         }
@@ -113,13 +129,131 @@ export default function RequirementsPage() {
     });
   }, [generationResults]);
 
+  // Save generated content as Draft for User Stories only (debounced)
+  const saveDraft = debounce(async () => {
+    const tab = "User Stories & Acceptance Criteria";
+    const content = generationResults[tab];
+    if (!content) return;
+
+    // Extract title from content (look for "Title:" line or use default)
+    let title = "User Story";
+    if (typeof content === "string") {
+      const match = content.match(/Title:\s*(.+?)(?:\n|$)/);
+      if (match && match[1]) {
+        title = match[1].substring(0, 100);
+      } else {
+        title = content.split("\n")[0].substring(0, 100);
+      }
+    }
+
+    try {
+      // Check if draft already exists in the database
+      const response = await axios.get(
+        `http://localhost:3000/api/jira/history/${projectKey}`
+      );
+      const existingDraft = response.data.some(
+        (h) => h.type === tab && h.content === content && h.status === "Draft"
+      );
+      if (existingDraft) {
+        console.log("Draft already exists, skipping save.");
+        return;
+      }
+
+      await axios.post("http://localhost:3000/api/jira/history/draft", {
+        projectKey,
+        type: tab,
+        title,
+        content:
+          typeof content === "object" ? JSON.stringify(content) : content,
+        status: "Draft",
+      });
+      setError(null);
+      // Refetch history to update local state
+      const historyResponse = await axios.get(
+        `http://localhost:3000/api/jira/history/${projectKey}`
+      );
+      setHistory(historyResponse.data);
+    } catch (error) {
+      console.error("Failed to save draft:", error.message);
+      setError("Failed to save draft. Please try again.");
+    }
+  }, 1000);
+
+  const handlePushToJira = async (tab) => {
+    try {
+      const content =
+        tab === "Automation Scripts" && typeof editedResults[tab] === "object"
+          ? editedResults[tab][selectedScriptLanguage] || ""
+          : editedResults[tab] || "";
+      if (!content) {
+        setError("No content to push to Jira.");
+        return;
+      }
+      let title = `${tab} for ${projectKey}`;
+      if (tab === "User Stories & Acceptance Criteria") {
+        const match = content.match(/Title:\s*(.+?)(?:\n|$)/);
+        if (match && match[1]) {
+          title = match[1].substring(0, 100);
+        } else {
+          title = content.split("\n")[0].substring(0, 100);
+        }
+      }
+      const response = await axios.post(
+        "http://localhost:3000/api/jira/issue",
+        {
+          projectKey,
+          type: tab,
+          title,
+          content,
+        }
+      );
+      // Refetch history to ensure latest data
+      const historyResponse = await axios.get(
+        `http://localhost:3000/api/jira/history/${projectKey}`
+      );
+      setHistory(historyResponse.data);
+      setError(null);
+      alert(`Successfully pushed to Jira as ${response.data.issueId}`);
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.error?.errors?.issuetype ||
+        error.response?.data?.error?.errorMessages?.[0] ||
+        "Failed to push to Jira. Please try again.";
+      setError(errorMessage);
+    }
+  };
+
+  useEffect(() => {
+    saveDraft();
+  }, [generationResults, projectKey]);
+
+  // Fetch history
+  useEffect(() => {
+    async function fetchHistory() {
+      try {
+        const response = await axios.get(
+          `http://localhost:3000/api/jira/history/${projectKey}`
+        );
+        setHistory(response.data);
+      } catch (error) {
+        console.error("Failed to fetch history:", error.message);
+        setError("Failed to fetch generation history.");
+      }
+    }
+    fetchHistory();
+  }, [projectKey]);
+
   const handleEditResult = (tab, value) => {
     setEditedResults((prev) => ({ ...prev, [tab]: value }));
   };
 
   const handleCopy = async (tab) => {
     try {
-      await navigator.clipboard.writeText(editedResults[tab] || "");
+      const content =
+        tab === "Automation Scripts" && typeof editedResults[tab] === "object"
+          ? editedResults[tab][selectedScriptLanguage] || ""
+          : editedResults[tab] || "";
+      await navigator.clipboard.writeText(content);
       setCopiedTab(tab);
       setTimeout(() => setCopiedTab(null), 1500);
     } catch (err) {
@@ -127,16 +261,10 @@ export default function RequirementsPage() {
     }
   };
 
-  const handlePushToJira = (tab) => {
-    // Stub: Replace with actual Jira push logic
-    alert(`Pushing to Jira for ${tab}:\n\n${editedResults[tab] || ""}`);
-  };
-
   const handleEditToggle = (tab) => {
     setEditMode((prev) => {
       const isEditing = prev[tab];
       if (isEditing) {
-        // Just saved
         setJustSaved((prevSaved) => ({ ...prevSaved, [tab]: true }));
         setTimeout(() => {
           setJustSaved((prevSaved) => ({ ...prevSaved, [tab]: false }));
@@ -151,8 +279,8 @@ export default function RequirementsPage() {
     setGenerationResults({}); // Clear previous results
     setEditedResults({}); // Clear previous edits
     setError(null);
-    setActiveGenerationTab('User Stories & Acceptance Criteria');
-    const filesContent = uploadedFiles.map(f => f.content).join("\n");
+    setActiveGenerationTab("User Stories & Acceptance Criteria");
+    const filesContent = uploadedFiles.map((f) => f.content).join("\n");
     const requirement = (filesContent ? filesContent + "\n" : "") + prompt;
     console.log("Prompt being sent:", prompt);
     if (!requirement.trim()) {
@@ -188,11 +316,26 @@ export default function RequirementsPage() {
             payload
           );
           if (tab === "Automation Scripts") {
-            setGenerationResults((prev) => ({ ...prev, [tab]: res.data.result }));
+            setGenerationResults((prev) => ({
+              ...prev,
+              [tab]: res.data.result,
+            }));
+            setSelectedScriptLanguage("Python");
+            setGenerationResults((prev) => ({
+              ...prev,
+              [tab]: res.data.result,
+            }));
             setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
             setSelectedScriptLanguage("Python");
           } else {
-            setGenerationResults((prev) => ({ ...prev, [tab]: res.data.result }));
+            setGenerationResults((prev) => ({
+              ...prev,
+              [tab]: res.data.result,
+            }));
+            setGenerationResults((prev) => ({
+              ...prev,
+              [tab]: res.data.result,
+            }));
             setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
           }
           setGenerationErrors((prev) => ({ ...prev, [tab]: undefined }));
@@ -231,7 +374,6 @@ export default function RequirementsPage() {
     }
   }, [location.pathname]);
 
-  // Helper to check if any generation is loading
   const isAnyGenerationLoading = Object.values(generationLoading).some(Boolean);
 
   const handleFileChange = (e) => {
@@ -245,16 +387,19 @@ export default function RequirementsPage() {
     ];
     let errorSet = false;
     files.forEach((file) => {
-      if (!allowedTypes.includes(file.type) && !file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
+      if (
+        !allowedTypes.includes(file.type) &&
+        !file.name.endsWith(".md") &&
+        !file.name.endsWith(".txt")
+      ) {
         setError("Unsupported file type. Please upload a .txt or .md file.");
         errorSet = true;
         return;
-      } 
+      }
       const reader = new FileReader();
       reader.onload = (event) => {
         setUploadedFiles((prev) => {
-          // Avoid duplicate file names
-          if (prev.some(f => f.name === file.name)) return prev;
+          if (prev.some((f) => f.name === file.name)) return prev;
           return [...prev, { name: file.name, content: event.target.result }];
         });
         setError(null);
@@ -268,389 +413,430 @@ export default function RequirementsPage() {
     if (!errorSet) setError(null);
   };
 
-  const handleRemoveFile = (name) => setUploadedFiles((prev) => prev.filter(f => f.name !== name));
+  const handleRemoveFile = (name) =>
+    setUploadedFiles((prev) => prev.filter((f) => f.name !== name));
 
   const handleUploadClick = () => {
-    if (fileInputRef.current) fileInputRef.current.value = null; // reset
+    if (fileInputRef.current) fileInputRef.current.value = null;
     fileInputRef.current?.click();
   };
 
-  // Helper to render bold markdown (**text**) as <strong>text</strong>
   function renderBoldMarkdown(text) {
     if (!text) return "";
-    // Replace **text** with <strong>text</strong>
     return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Header />
 
-      {/* Main Layout */}
-      <div className="flex flex-1">
-        {/* Main Sidebar */}
-        <div className="w-16 bg-white shadow-sm border-r border-gray-200 flex flex-col">
-          <nav className="flex-1 p-2 space-y-2">
-            {mainSidebarItems.map((item) => (
-              <button
-                key={item.name}
-                onClick={() => {
-                  setActiveMainTab(item.name);
-                  navigate(item.path, { state: { projectKey } });
-                }}
-                className={`w-full flex items-center justify-center cursor-pointer p-3 rounded-lg transition-colors ${
-                  item.name === activeMainTab
-                    ? "bg-red-50 text-red-600 border-2 border-red-600"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-                title={item.name}
-              >
-                <item.icon className="w-5 h-5" />
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Project Sidebar */}
-        <div className="w-64 bg-white shadow-sm border-r border-gray-200 flex flex-col">
-          <nav className="flex-1 p-4 space-y-2">
-            {projectSidebarItems.map((item) => (
-              <button
-                key={item.name}
-                onClick={() => {
-                  setActiveSubTab(item.name);
-                  navigate(item.path, { state: { projectKey } });
-                }}
-                className={`w-full flex items-center cursor-pointer px-3 py-2 text-left rounded-lg transition-colors ${
-                  item.name === activeSubTab
-                    ? "bg-red-50 font-medium text-red-600 border-l-4 border-red-600"
-                    : "font-medium hover:bg-gray-100 text-gray-600"
-                }`}
-              >
-                <item.icon className="w-5 h-5 mr-3" />
-                {item.name}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <main className="flex-1 overflow-y-auto">
-            <div className="p-6">
-              {/* Breadcrumb */}
-              <div className="flex items-center text-sm text-gray-500 mb-6">
-                <Link
-                  to="/home"
-                  className="font-medium text-[#343434] cursor-pointer"
+        {/* Main Layout */}
+        <div className="flex flex-1">
+          {/* Main Sidebar */}
+          <div className="w-16 bg-white shadow-sm border-r border-gray-200 flex flex-col">
+            <nav className="flex-1 p-2 space-y-2">
+              {mainSidebarItems.map((item) => (
+                <button
+                  key={item.name}
+                  onClick={() => {
+                    setActiveMainTab(item.name);
+                    navigate(item.path, { state: { projectKey } });
+                  }}
+                  className={`w-full flex items-center justify-center cursor-pointer p-3 rounded-lg transition-colors ${
+                    item.name === activeMainTab
+                      ? "bg-red-50 text-red-600 border-2 border-red-600"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                  title={item.name}
                 >
-                  Home
-                </Link>
-                <span className="mx-2">/</span>
-                <Link
-                  to="/dashboard"
-                  state={{ projectKey }} // Pass projectKey in state
-                  className="font-medium text-[#343434] cursor-pointer"
+                  <item.icon className="w-5 h-5" />
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Project Sidebar */}
+          <div className="w-64 bg-white shadow-sm border-r border-gray-200 flex flex-col">
+            <nav className="flex-1 p-4 space-y-2">
+              {projectSidebarItems.map((item) => (
+                <button
+                  key={item.name}
+                  onClick={() => {
+                    setActiveSubTab(item.name);
+                    navigate(item.path, { state: { projectKey } });
+                  }}
+                  className={`w-full flex items-center cursor-pointer px-3 py-2 text-left rounded-lg transition-colors ${
+                    item.name === activeSubTab
+                      ? "bg-red-50 font-medium text-red-600 border-l-4 border-red-600"
+                      : "font-medium hover:bg-gray-100 text-gray-600"
+                  }`}
                 >
-                  {projectName}
-                </Link>
-                <span className="mx-2">/</span>
-                <span className="text-red-600 font-medium">New Generation</span>
-              </div>
+                  <item.icon className="w-5 h-5 mr-3" />
+                  {item.name}
+                </button>
+              ))}
+            </nav>
+          </div>
 
-              {/* Page Header */}
-              <div className="flex items-center justify-between mb-8">
-                <h1 className="text-2xl font-bold text-gray-900">
-                  AI-Powered Generation for Your Project
-                </h1>
-                <div className="flex items-center space-x-4">
-                  {loading ? (
-                    <span>Loading projects...</span>
-                  ) : (
-                    <select
-                      value={selectedProject}
-                      onChange={(e) => {
-                        setSelectedProject(e.target.value);
-                        const selected = projects.find((p) => p.name === e.target.value);
-                        if (selected) {
-                          navigate("/requirements", { state: { projectKey: selected.key } });
-                        }
-                      }}
-                      className="px-4 py-2 border border-gray-300 font-medium cursor-pointer rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      {projects.map((project) => (
-                        <option key={project.key} value={project.name}>
-                          {project.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <button className="px-4 py-2 text-sm font-medium cursor-pointer text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    History
-                  </button>
-                </div>
-              </div>
-
-              {/* Content Layout */}
-              <div className="space-y-6">
-                {/* Error Message */}
-                {error && (
-                  <div className="bg-red-100 text-red-700 p-4 rounded-lg">
-                    {error}
-                  </div>
-                )}
-
-                {/* Uploaded file chips above input */}
-                {uploadedFiles.length > 0 && (
-                  <div className="mb-2 flex flex-wrap items-center gap-2 max-w-full">
-                    {uploadedFiles.map(file => (
-                      <div key={file.name} className="flex items-center bg-gray-100 border border-gray-300 rounded px-3 py-1 relative group max-w-xs overflow-hidden">
-                        <AiOutlineFile className="w-4 h-4 text-gray-500 mr-1" />
-                        <span className="truncate text-sm text-gray-800" title={file.name}>{file.name}</span>
-                        <button
-                          className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500"
-                          onClick={() => handleRemoveFile(file.name)}
-                          type="button"
-                          aria-label="Remove file"
-                        >
-                          <AiOutlineClose className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Prompt Input Card */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <div className="relative mb-6">
-                    <div className="border border-gray-300 rounded-lg pt-4 px-4 pb-2 pr-24 bg-white">
-                      <div className="absolute -top-3 left-4 bg-white px-1 text-sm font-medium text-gray-700">
-                        Prompt
-                      </div>
-                      <textarea
-                        ref={textareaRef}
-                        value={prompt}
-                        onChange={handlePromptChange}
-                        placeholder="Enter a story ID (e.g., TES-123) or describe your requirements..."
-                        className="w-full max-h-40 overflow-auto border-none outline-none resize-none text-sm text-gray-700 pr-4"
-                        style={{ minHeight: "3rem" }}
-                      />
-
-                      <input
-                        type="file"
-                        accept=".txt,.md,text/plain,text/markdown,text/x-markdown"
-                        ref={fileInputRef}
-                        style={{ display: "none" }}
-                        onChange={handleFileChange}
-                        multiple
-                      />
-                      <button
-                        className="absolute top-2 right-3 flex items-center cursor-pointer gap-1 px-2 py-1 border border-black rounded text-gray-700 hover:text-gray-900 hover:bg-gray-100 text-sm bg-white"
-                        onClick={handleUploadClick}
-                        type="button"
-                      >
-                        <span className="text-sm font-medium">Upload</span>
-                        <AiOutlineCloudUpload className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleGenerateTest}
-                    className="w-full sm:w-auto px-4 py-2 bg-[#0089EB] cursor-pointer text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                    disabled={isAnyGenerationLoading || isGeneratingAll}
-                    style={
-                      isAnyGenerationLoading || isGeneratingAll
-                        ? { opacity: 0.6, cursor: "not-allowed" }
-                        : {}
-                    }
+          {/* Main Content */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <main className="flex-1 overflow-y-auto">
+              <div className="p-6">
+                {/* Breadcrumb */}
+                <div className="flex items-center text-sm text-gray-500 mb-6">
+                  <Link
+                    to="/home"
+                    className="font-medium text-[#343434] cursor-pointer"
                   >
-                    Generate test
-                  </button>
+                    Home
+                  </Link>
+                  <span className="mx-2">/</span>
+                  <Link
+                    to="/dashboard"
+                    state={{ projectKey }} // Pass projectKey in state
+                    className="font-medium text-[#343434] cursor-pointer"
+                  >
+                    {projectName}
+                  </Link>
+                  <span className="mx-2">/</span>
+                  <span className="text-red-600 font-medium">
+                    New Generation
+                  </span>
                 </div>
 
-                {/* Generation Tabs */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                  <div className="border-b border-gray-200">
-                    <nav className="flex space-x-8 px-6 items-center">
-                      {generationTabs.map((tab) => (
-                        <button
-                          key={tab.name}
-                          onClick={() => setActiveGenerationTab(tab.name)}
-                          className={`py-4 px-1 border-b-2 font-medium text-sm cursor-pointer transition-colors ${
-                            tab.name === activeGenerationTab
-                              ? "border-red-500 text-red-600"
-                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                          }`}
-                        >
-                          {tab.name}
-                        </button>
-                      ))}
-                      {activeGenerationTab === "Automation Scripts" && (
-                        <select
-                          value={selectedScriptLanguage}
-                          onChange={e => setSelectedScriptLanguage(e.target.value)}
-                          className="-ml-4 px-3 py-1.5 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-150 hover:border-blue-400 cursor-pointer"
-                          style={{ minWidth: 110 }}
-                        >
-                          {scriptLanguages.map(lang => (
-                            <option key={lang} value={lang}>{lang}</option>
-                          ))}
-                        </select>
-                      )}
-                    </nav>
+                {/* Page Header */}
+                <div className="flex items-center justify-between mb-8">
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    AI-Powered Generation for Your Project
+                  </h1>
+                  <div className="flex items-center space-x-4">
+                    {loading ? (
+                      <span>Loading projects...</span>
+                    ) : (
+                      <select
+                        value={selectedProject}
+                        onChange={(e) => {
+                          setSelectedProject(e.target.value);
+                          const selected = projects.find(
+                            (p) => p.name === e.target.value
+                          );
+                          if (selected) {
+                            navigate("/requirements", {
+                              state: { projectKey: selected.key },
+                            });
+                          }
+                        }}
+                        className="px-4 py-2 border border-gray-300 font-medium cursor-pointer rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {projects.map((project) => (
+                          <option key={project.key} value={project.name}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <Link
+                      to="/history"
+                      state={{ projectKey }}
+                      className="px-4 py-2 text-sm font-medium cursor-pointer text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      History
+                    </Link>
                   </div>
-                  <div className="p-6">
-                    <div className="min-h-[400px]">
-                      {isGeneratingAll ? (
-                        <div className="flex items-center justify-center h-40 text-gray-500">
-                          Generating results, please wait...
-                        </div>
-                      ) : generationLoading[activeGenerationTab] ? (
-                        <div className="flex items-center justify-center h-40 text-gray-500">
-                          Generating...
-                        </div>
-                      ) : generationErrors[activeGenerationTab] ? (
-                        <div className="bg-red-100 text-red-700 p-4 rounded-lg">
-                          {generationErrors[activeGenerationTab]}
-                        </div>
-                      ) : activeGenerationTab === "Automation Scripts" ? (
-                        <div className="relative w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap" style={{ minHeight: "24rem" }}>
-                          {/* Copy button in top right */}
-                          <button
-                            className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 hover:text-blue-600 hover:bg-gray-200 text-xs font-medium transition-all"
-                            onClick={async () => {
-                              const script = generationResults["Automation Scripts"] && typeof generationResults["Automation Scripts"] === "object"
-                                ? (generationResults["Automation Scripts"][selectedScriptLanguage] || "")
-                                : "";
-                              if (script) {
-                                await navigator.clipboard.writeText(script);
-                                setCopiedTab("Automation Scripts");
-                                setTimeout(() => setCopiedTab(null), 1500);
-                              }
-                            }}
-                            type="button"
-                            aria-label="Copy script"
+                </div>
+
+                {/* Content Layout */}
+                <div className="space-y-6">
+                  {/* Error Message */}
+                  {error && (
+                    <div className="bg-red-100 text-red-700 p-4 rounded-lg">
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Uploaded file chips above input */}
+                  {uploadedFiles.length > 0 && (
+                    <div className="mb-2 flex flex-wrap items-center gap-2 max-w-full">
+                      {uploadedFiles.map((file) => (
+                        <div
+                          key={file.name}
+                          className="flex items-center bg-gray-100 border border-gray-300 rounded px-3 py-1 relative group max-w-xs overflow-hidden"
+                        >
+                          <AiOutlineFile className="w-4 h-4 text-gray-500 mr-1" />
+                          <span
+                            className="truncate text-sm text-gray-800"
+                            title={file.name}
                           >
-                            {copiedTab === "Automation Scripts" ? (
-                              <>
-                                <TiTick className="w-4 h-4 text-green-600" /> Copied!
-                              </>
-                            ) : (
-                              <>
-                                <MdContentCopy className="w-4 h-4" /> Copy
-                              </>
-                            )}
+                            {file.name}
+                          </span>
+                          <button
+                            className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500"
+                            onClick={() => handleRemoveFile(file.name)}
+                            type="button"
+                            aria-label="Remove file"
+                          >
+                            <AiOutlineClose className="w-4 h-4" />
                           </button>
-                          {/* Script content */}
-                          {generationResults["Automation Scripts"] && typeof generationResults["Automation Scripts"] === "object"
-                            ? (generationResults["Automation Scripts"][selectedScriptLanguage] || "No script generated for this language.")
-                            : "No automation scripts generated yet. Click 'Generate test' to create scripts."}
                         </div>
-                      ) : generationResults[activeGenerationTab] ? (
-                        <div className="flex gap-4 mb-2">
-                          {/* Left: Content area */}
-                          <div className="flex-1">
-                            {editMode[activeGenerationTab] ? (
-                              <textarea
-                                className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-gray-50 resize-none"
-                                value={editedResults[activeGenerationTab] || ""}
-                                onChange={(e) =>
-                                  handleEditResult(
-                                    activeGenerationTab,
-                                    e.target.value
-                                  )
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Prompt Input Card */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div className="relative mb-6">
+                      <div className="border border-gray-300 rounded-lg pt-4 px-4 pb-2 pr-24 bg-white">
+                        <div className="absolute -top-3 left-4 bg-white px-1 text-sm font-medium text-gray-700">
+                          Prompt
+                        </div>
+                        <textarea
+                          ref={textareaRef}
+                          value={prompt}
+                          onChange={handlePromptChange}
+                          placeholder="Enter a story ID (e.g., TES-123) or describe your requirements..."
+                          className="w-full max-h-40 overflow-auto border-none outline-none resize-none text-sm text-gray-700 pr-4"
+                          style={{ minHeight: "3rem" }}
+                        />
+
+                        <input
+                          type="file"
+                          accept=".txt,.md,text/plain,text/markdown,text/x-markdown"
+                          ref={fileInputRef}
+                          style={{ display: "none" }}
+                          onChange={handleFileChange}
+                          multiple
+                        />
+                        <button
+                          className="absolute top-2 right-3 flex items-center cursor-pointer gap-1 px-2 py-1 border border-black rounded text-gray-700 hover:text-gray-900 hover:bg-gray-100 text-sm bg-white"
+                          onClick={handleUploadClick}
+                          type="button"
+                        >
+                          <span className="text-sm font-medium">Upload</span>
+                          <AiOutlineCloudUpload className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleGenerateTest}
+                      className="w-full sm:w-auto px-4 py-2 bg-[#0089EB] cursor-pointer text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                      disabled={isAnyGenerationLoading || isGeneratingAll}
+                      style={
+                        isAnyGenerationLoading || isGeneratingAll
+                          ? { opacity: 0.6, cursor: "not-allowed" }
+                          : {}
+                      }
+                    >
+                      Generate test
+                    </button>
+                  </div>
+
+                  {/* Generation Tabs */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div className="border-b border-gray-200">
+                      <nav className="flex space-x-8 px-6 items-center">
+                        {generationTabs.map((tab) => (
+                          <button
+                            key={tab.name}
+                            onClick={() => setActiveGenerationTab(tab.name)}
+                            className={`py-4 px-1 border-b-2 font-medium text-sm cursor-pointer transition-colors ${
+                              tab.name === activeGenerationTab
+                                ? "border-red-500 text-red-600"
+                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                            }`}
+                          >
+                            {tab.name}
+                          </button>
+                        ))}
+                        {activeGenerationTab === "Automation Scripts" && (
+                          <select
+                            value={selectedScriptLanguage}
+                            onChange={(e) =>
+                              setSelectedScriptLanguage(e.target.value)
+                            }
+                            className="-ml-4 px-3 py-1.5 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-150 hover:border-blue-400 cursor-pointer"
+                            style={{ minWidth: 110 }}
+                          >
+                            {scriptLanguages.map((lang) => (
+                              <option key={lang} value={lang}>
+                                {lang}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </nav>
+                    </div>
+                    <div className="p-6">
+                      <div className="min-h-[400px]">
+                        {isGeneratingAll ? (
+                          <div className="min-h-[400px] flex items-center justify-center text-gray-500">
+                            Generating results, please wait...
+                          </div>
+                        ) : generationLoading[activeGenerationTab] ? (
+                          <div className="flex items-center justify-center h-40 text-gray-500">
+                            Generating...
+                          </div>
+                        ) : generationErrors[activeGenerationTab] ? (
+                          <div className="bg-red-100 text-red-700 p-4 rounded-lg">
+                            {generationErrors[activeGenerationTab]}
+                          </div>
+                        ) : activeGenerationTab === "Automation Scripts" ? (
+                          <div
+                            className="relative w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap"
+                            style={{ minHeight: "24rem" }}
+                          >
+                            {/* Copy button in top right */}
+                            <button
+                              className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 hover:text-blue-600 hover:bg-gray-200 text-xs font-medium transition-all"
+                              onClick={async () => {
+                                const script =
+                                  generationResults["Automation Scripts"] &&
+                                  typeof generationResults[
+                                    "Automation Scripts"
+                                  ] === "object"
+                                    ? generationResults["Automation Scripts"][
+                                        selectedScriptLanguage
+                                      ] || ""
+                                    : "";
+                                if (script) {
+                                  await navigator.clipboard.writeText(script);
+                                  setCopiedTab("Automation Scripts");
+                                  setTimeout(() => setCopiedTab(null), 1500);
                                 }
-                                style={{ backgroundColor: "#fff" }}
-                              />
-                            ) : (
-                              <div
-                                className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap"
-                                style={{ minHeight: "24rem" }}
-                                dangerouslySetInnerHTML={{
-                                  __html: renderBoldMarkdown(
-                                    editedResults[activeGenerationTab]
-                                  ),
-                                }}
-                              />
-                            )}
-                          </div>
-                          {/* Right: Buttons */}
-                          <div className="flex flex-col gap-2 justify-start">
-                            <button
-                              className="px-4 py-2 bg-[#0089EB] cursor-pointer text-white rounded-lg hover:bg-[#007acc] text-sm font-medium"
-                              onClick={() =>
-                                handlePushToJira(activeGenerationTab)
-                              }
+                              }}
                               type="button"
+                              aria-label="Copy script"
                             >
-                              Push to Jira
+                              {copiedTab === "Automation Scripts" ? (
+                                <>
+                                  <TiTick className="w-4 h-4 text-green-600" />{" "}
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <MdContentCopy className="w-4 h-4" /> Copy
+                                </>
+                              )}
                             </button>
-                            <button
-                              className="text-sm font-medium flex cursor-pointer items-center pl-8 gap-x-1 transition-transform duration-150"
-                              onClick={() =>
-                                handleEditToggle(activeGenerationTab)
-                              }
-                              type="button"
-                            >
+                            {/* Script content */}
+                            {generationResults["Automation Scripts"] &&
+                            typeof generationResults["Automation Scripts"] ===
+                              "object"
+                              ? generationResults["Automation Scripts"][
+                                  selectedScriptLanguage
+                                ] || "No script generated for this language."
+                              : "No automation scripts generated yet. Click 'Generate test' to create scripts."}
+                          </div>
+                        ) : generationResults[activeGenerationTab] ? (
+                          <div className="flex gap-4 mb-2">
+                            {/* Left: Content area */}
+                            <div className="flex-1">
                               {editMode[activeGenerationTab] ? (
-                                <IoSaveOutline className="w-4 h-4" />
+                                <textarea
+                                  className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-gray-50 resize-none"
+                                  value={
+                                    editedResults[activeGenerationTab] || ""
+                                  }
+                                  onChange={(e) =>
+                                    handleEditResult(
+                                      activeGenerationTab,
+                                      e.target.value
+                                    )
+                                  }
+                                  style={{ backgroundColor: "#fff" }}
+                                />
                               ) : (
-                                <CiEdit className="w-4 h-4" />
+                                <div
+                                  className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap"
+                                  style={{ minHeight: "24rem" }}
+                                  dangerouslySetInnerHTML={{
+                                    __html: renderBoldMarkdown(
+                                      editedResults[activeGenerationTab]
+                                    ),
+                                  }}
+                                />
                               )}
-                              {justSaved[activeGenerationTab] ? (
-                                <span className="text-green-600 font-medium animate-pulse">
-                                  Saved
-                                </span>
-                              ) : editMode[activeGenerationTab] ? (
-                                "Save"
-                              ) : (
-                                "Edit"
-                              )}
-                            </button>
-                            <button
-                              className="text-sm font-medium flex items-center cursor-pointer pl-8 gap-x-1 transition-all duration-300 ease-in-out"
-                              onClick={() => handleCopy(activeGenerationTab)}
-                              type="button"
-                            >
-                              {copiedTab === activeGenerationTab ? (
-                                <TiTick className="w-4 h-4 text-green-600" />
-                              ) : (
-                                <MdContentCopy className="w-4 h-4" />
-                              )}
-                              <span
-                                className={`transition-all duration-300 ${
-                                  copiedTab === activeGenerationTab
-                                    ? "text-green-600"
-                                    : ""
-                                }`}
+                            </div>
+                            {/* Right: Buttons */}
+                            <div className="flex flex-col gap-2 justify-start">
+                              <button
+                                className="px-4 py-2 bg-[#0089EB] cursor-pointer text-white rounded-lg hover:bg-[#007acc] text-sm font-medium"
+                                onClick={() =>
+                                  handlePushToJira(activeGenerationTab)
+                                }
+                                type="button"
                               >
-                                {copiedTab === activeGenerationTab
-                                  ? "Copied"
-                                  : "Copy"}
-                              </span>
-                            </button>
+                                Push to Jira
+                              </button>
+                              <button
+                                className="text-sm font-medium flex cursor-pointer items-center pl-8 gap-x-1 transition-transform duration-150"
+                                onClick={() =>
+                                  handleEditToggle(activeGenerationTab)
+                                }
+                                type="button"
+                              >
+                                {editMode[activeGenerationTab] ? (
+                                  <IoSaveOutline className="w-4 h-4" />
+                                ) : (
+                                  <CiEdit className="w-4 h-4" />
+                                )}
+                                {justSaved[activeGenerationTab] ? (
+                                  <span className="text-green-600 font-medium animate-pulse">
+                                    Saved
+                                  </span>
+                                ) : editMode[activeGenerationTab] ? (
+                                  "Save"
+                                ) : (
+                                  "Edit"
+                                )}
+                              </button>
+                              <button
+                                className="text-sm font-medium flex items-center cursor-pointer pl-8 gap-x-1 transition-all duration-300 ease-in-out"
+                                onClick={() => handleCopy(activeGenerationTab)}
+                                type="button"
+                              >
+                                {copiedTab === activeGenerationTab ? (
+                                  <TiTick className="w-4 h-4 text-green-600" />
+                                ) : (
+                                  <MdContentCopy className="w-4 h-4" />
+                                )}
+                                <span
+                                  className={`transition-all duration-300 ${
+                                    copiedTab === activeGenerationTab
+                                      ? "text-green-600"
+                                      : ""
+                                  }`}
+                                >
+                                  {copiedTab === activeGenerationTab
+                                    ? "Copied"
+                                    : "Copy"}
+                                </span>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="text-center text-gray-500">
-                          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                            <GrDocumentTest className="w-8 h-8" />
+                        ) : (
+                          <div className="min-h-[400px] flex items-center justify-center">
+                            <div className="text-center text-gray-500">
+                              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                <GrDocumentTest className="w-8 h-8" />
+                              </div>
+                              <p className="text-sm">
+                                Generate {activeGenerationTab.toLowerCase()} by
+                                entering a story ID above
+                              </p>
+                            </div>
                           </div>
-                          <p className="text-sm">
-                            Generate {activeGenerationTab.toLowerCase()} by
-                            entering a story ID above
-                          </p>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </main>
+            </main>
+          </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
