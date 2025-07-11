@@ -550,7 +550,7 @@ export default function RequirementsPage() {
       Object.entries(endpoints).map(async ([tab, { endpoint, payload }]) => {
         try {
           const res = await axios.post(
-            `http://localhost:8000${endpoint}`,
+            `https://testomate-backend-1.onrender.com${endpoint}`,
             payload
           );
           if (tab === "Automation Scripts") {
