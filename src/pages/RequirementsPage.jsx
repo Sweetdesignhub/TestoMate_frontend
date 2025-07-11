@@ -61,6 +61,8 @@ export default function RequirementsPage() {
     useState("Python");
   const scriptLanguages = ["Python", "Java", "JavaScript", "C#"];
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [showJiraConfirm, setShowJiraConfirm] = useState(false);
+  const [jiraSuccess, setJiraSuccess] = useState(null); // { id, url }
 
   // Add new state for the four fields at the top of the component
   const [title, setTitle] = useState("");
@@ -206,46 +208,94 @@ export default function RequirementsPage() {
   }, 1000);
 
   const handlePushToJira = async (tab) => {
+    setJiraSuccess(null);
+    setError(null);
+    setShowJiraConfirm(true);
+    // The actual push will be handled in handleConfirmPushToJira
+  };
+
+  const handleConfirmPushToJira = async (tab) => {
+    setShowJiraConfirm(false);
     try {
-      const content =
-        tab === "Automation Scripts" && typeof editedResults[tab] === "object"
-          ? editedResults[tab][selectedScriptLanguage] || ""
-          : editedResults[tab] || "";
-      if (!content) {
-        setError("No content to push to Jira.");
-        return;
-      }
-      let title = `${tab} for ${projectKey}`;
       if (tab === "User Stories & Acceptance Criteria") {
-        const match = content.match(/Title:\s*(.+?)(?:\n|$)/);
-        if (match && match[1]) {
-          title = match[1].substring(0, 100);
-        } else {
-          title = content.split("\n")[0].substring(0, 100);
+        if (!title || !description || !priority) {
+          setError("Missing required fields for Jira issue creation.");
+          return;
         }
+        // Robustly handle labels: if array, use as-is; if string, split
+        let labelsArray = [];
+        if (Array.isArray(labels)) {
+          labelsArray = labels.map(l => l.trim()).filter(Boolean);
+        } else if (typeof labels === "string") {
+          labelsArray = labels.split(/,|;/).map(l => l.trim()).filter(Boolean);
+        }
+        const response = await axios.post(
+          "http://localhost:3000/api/jira/createIssue",
+          {
+            projectKey,
+            title,
+            description,
+            acceptance_criteria: acceptance,
+            priority,
+            labels: labelsArray,
+            due_date: dueDate,
+            start_date: startDate,
+            story_point_estimate: storyPointEstimate,
+          }
+        );
+        const historyResponse = await axios.get(
+          `http://localhost:3000/api/jira/history/${projectKey}`
+        );
+        setHistory(historyResponse.data);
+        setError(null);
+        setJiraSuccess({ id: response.data.issueId, url: response.data.issueUrl });
+      } else {
+        // Old behavior for other tabs
+        const content =
+          tab === "Automation Scripts" && typeof editedResults[tab] === "object"
+            ? editedResults[tab][selectedScriptLanguage] || ""
+            : editedResults[tab] || "";
+        if (!content) {
+          setError("No content to push to Jira.");
+          return;
+        }
+        let title = `${tab} for ${projectKey}`;
+        if (tab === "User Stories & Acceptance Criteria") {
+          const match = content.match(/Title:\s*(.+?)(?:\n|$)/);
+          if (match && match[1]) {
+            title = match[1].substring(0, 100);
+          } else {
+            title = content.split("\n")[0].substring(0, 100);
+          }
+        }
+        const response = await axios.post(
+          "http://localhost:3000/api/jira/issue",
+          {
+            projectKey,
+            type: tab,
+            title,
+            content,
+          }
+        );
+        const historyResponse = await axios.get(
+          `http://localhost:3000/api/jira/history/${projectKey}`
+        );
+        setHistory(historyResponse.data);
+        setError(null);
+        setJiraSuccess({ id: response.data.issueId });
       }
-      const response = await axios.post(
-        "http://localhost:3000/api/jira/issue",
-        {
-          projectKey,
-          type: tab,
-          title,
-          content,
-        }
-      );
-      // Refetch history to ensure latest data
-      const historyResponse = await axios.get(
-        `http://localhost:3000/api/jira/history/${projectKey}`
-      );
-      setHistory(historyResponse.data);
-      setError(null);
-      alert(`Successfully pushed to Jira as ${response.data.issueId}`);
     } catch (error) {
-      const errorMessage =
+      let errorMessage =
         error.response?.data?.error?.errors?.issuetype ||
         error.response?.data?.error?.errorMessages?.[0] ||
+        error.response?.data?.error ||
+        error.message ||
         "Failed to push to Jira. Please try again.";
+      if (typeof errorMessage === "object") {
+        errorMessage = JSON.stringify(errorMessage);
+      }
       setError(errorMessage);
+      setJiraSuccess(null);
     }
   };
 
@@ -704,10 +754,19 @@ export default function RequirementsPage() {
 
                 {/* Content Layout */}
                 <div className="space-y-6">
-                  {/* Error Message */}
-                  {error && (
-                    <div className="bg-red-100 text-red-700 p-4 rounded-lg">
-                      {error}
+                  {(error || jiraSuccess) && (
+                    <div className={
+                      error
+                        ? "bg-red-100 text-red-700 p-4 rounded-lg"
+                        : "bg-green-100 text-green-700 p-4 rounded-lg"
+                    }>
+                      {error
+                        ? (typeof error === "object" ? JSON.stringify(error) : error)
+                        : (
+                          <span>
+                            Pushed to Jira: <a href={jiraSuccess.url} target="_blank" rel="noopener noreferrer" className="underline font-bold">{jiraSuccess.id}</a>
+                          </span>
+                        )}
                     </div>
                   )}
 
@@ -988,6 +1047,27 @@ export default function RequirementsPage() {
           </div>
         </div>
       </div>
+      {showJiraConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-md">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-sm w-full flex flex-col items-center">
+            <div className="text-lg font-semibold mb-4">Are you sure you want to push to Jira?</div>
+            <div className="flex gap-4 mt-2">
+              <button
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 font-medium"
+                onClick={() => setShowJiraConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-[#0089EB] text-white rounded hover:bg-blue-700 font-medium"
+                onClick={() => handleConfirmPushToJira(activeGenerationTab)}
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </ErrorBoundary>
   );
 }
