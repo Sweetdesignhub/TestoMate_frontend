@@ -177,7 +177,7 @@ export default function RequirementsPage() {
     try {
       // Check if draft already exists in the database
       const response = await axios.get(
-        `http://localhost:3000/api/jira/history/${projectKey}`
+        `https://testomate-backend.onrender.com/api/jira/history/${projectKey}`
       );
       const existingDraft = response.data.some(
         (h) => h.type === tab && h.content === content && h.status === "Draft"
@@ -187,18 +187,21 @@ export default function RequirementsPage() {
         return;
       }
 
-      await axios.post("http://localhost:3000/api/jira/history/draft", {
-        projectKey,
-        type: tab,
-        title,
-        content:
-          typeof content === "object" ? JSON.stringify(content) : content,
-        status: "Draft",
-      });
+      await axios.post(
+        "https://testomate-backend.onrender.com/api/jira/history/draft",
+        {
+          projectKey,
+          type: tab,
+          title,
+          content:
+            typeof content === "object" ? JSON.stringify(content) : content,
+          status: "Draft",
+        }
+      );
       setError(null);
       // Refetch history to update local state
       const historyResponse = await axios.get(
-        `http://localhost:3000/api/jira/history/${projectKey}`
+        `https://testomate-backend.onrender.com/api/jira/history/${projectKey}`
       );
       setHistory(historyResponse.data);
     } catch (error) {
@@ -225,12 +228,15 @@ export default function RequirementsPage() {
         // Robustly handle labels: if array, use as-is; if string, split
         let labelsArray = [];
         if (Array.isArray(labels)) {
-          labelsArray = labels.map(l => l.trim()).filter(Boolean);
+          labelsArray = labels.map((l) => l.trim()).filter(Boolean);
         } else if (typeof labels === "string") {
-          labelsArray = labels.split(/,|;/).map(l => l.trim()).filter(Boolean);
+          labelsArray = labels
+            .split(/,|;/)
+            .map((l) => l.trim())
+            .filter(Boolean);
         }
         const response = await axios.post(
-          "http://localhost:3000/api/jira/createIssue",
+          "https://testomate-backend.onrender.com/api/jira/createIssue",
           {
             projectKey,
             title,
@@ -244,11 +250,14 @@ export default function RequirementsPage() {
           }
         );
         const historyResponse = await axios.get(
-          `http://localhost:3000/api/jira/history/${projectKey}`
+          `https://testomate-backend.onrender.com/api/jira/history/${projectKey}`
         );
         setHistory(historyResponse.data);
         setError(null);
-        setJiraSuccess({ id: response.data.issueId, url: response.data.issueUrl });
+        setJiraSuccess({
+          id: response.data.issueId,
+          url: response.data.issueUrl,
+        });
       } else {
         // Old behavior for other tabs
         const content =
@@ -269,7 +278,7 @@ export default function RequirementsPage() {
           }
         }
         const response = await axios.post(
-          "http://localhost:3000/api/jira/issue",
+          "https://testomate-backend.onrender.com/api/jira/issue",
           {
             projectKey,
             type: tab,
@@ -278,7 +287,7 @@ export default function RequirementsPage() {
           }
         );
         const historyResponse = await axios.get(
-          `http://localhost:3000/api/jira/history/${projectKey}`
+          `https://testomate-backend.onrender.com/api/jira/history/${projectKey}`
         );
         setHistory(historyResponse.data);
         setError(null);
@@ -308,7 +317,7 @@ export default function RequirementsPage() {
     async function fetchHistory() {
       try {
         const response = await axios.get(
-          `http://localhost:3000/api/jira/history/${projectKey}`
+          `https://testomate-backend.onrender.com/api/jira/history/${projectKey}`
         );
         setHistory(response.data);
       } catch (error) {
@@ -322,21 +331,28 @@ export default function RequirementsPage() {
   // Save generated content to cache when it changes (but NOT on projectKey change)
   useEffect(() => {
     if (projectKey) {
-      if (!projectContentCache[projectKey]) projectContentCache[projectKey] = {};
+      if (!projectContentCache[projectKey])
+        projectContentCache[projectKey] = {};
       if (generationResults["User Stories & Acceptance Criteria"]) {
-        projectContentCache[projectKey].userStory = JSON.stringify(generationResults["User Stories & Acceptance Criteria"]);
+        projectContentCache[projectKey].userStory = JSON.stringify(
+          generationResults["User Stories & Acceptance Criteria"]
+        );
       }
       if (generationResults["Test Cases"]) {
-        projectContentCache[projectKey].testCases = JSON.stringify(generationResults["Test Cases"]);
+        projectContentCache[projectKey].testCases = JSON.stringify(
+          generationResults["Test Cases"]
+        );
       }
       if (generationResults["Automation Scripts"]) {
-        projectContentCache[projectKey].automation = JSON.stringify(generationResults["Automation Scripts"]);
+        projectContentCache[projectKey].automation = JSON.stringify(
+          generationResults["Automation Scripts"]
+        );
       }
     }
   }, [
     generationResults["User Stories & Acceptance Criteria"],
     generationResults["Test Cases"],
-    generationResults["Automation Scripts"]
+    generationResults["Automation Scripts"],
     // DO NOT include projectKey here!
   ]);
 
@@ -371,7 +387,8 @@ export default function RequirementsPage() {
         setReports(parsed.reports || "");
       }
       setGenerationResults({
-        ["User Stories & Acceptance Criteria"]: projectContentCache[projectKey].userStory
+        ["User Stories & Acceptance Criteria"]: projectContentCache[projectKey]
+          .userStory
           ? JSON.parse(projectContentCache[projectKey].userStory)
           : undefined,
         ["Test Cases"]: projectContentCache[projectKey].testCases
@@ -409,19 +426,19 @@ export default function RequirementsPage() {
       if (!isEditing && tab === "User Stories & Acceptance Criteria") {
         setUserStoryText(
           `Title: ${title}\n\n` +
-          `Assignee: ${assignee}\n\n` +
-          `Priority: ${priority}\n\n` +
-          `Parent: ${parent}\n\n` +
-          `Due Date: ${dueDate}\n\n` +
-          `Labels: ${labels}\n\n` +
-          `Team: ${team}\n\n` +
-          `Start Date: ${startDate}\n\n` +
-          `Sprint: ${sprint}\n\n` +
-          `Story Point Estimate: ${storyPointEstimate}\n\n` +
-          `Development: ${developement}\n\n` +
-          `Reports: ${reports}\n\n` +
-          `Description: ${description}\n\n` +
-          `Acceptance Criteria: ${acceptance}`
+            `Assignee: ${assignee}\n\n` +
+            `Priority: ${priority}\n\n` +
+            `Parent: ${parent}\n\n` +
+            `Due Date: ${dueDate}\n\n` +
+            `Labels: ${labels}\n\n` +
+            `Team: ${team}\n\n` +
+            `Start Date: ${startDate}\n\n` +
+            `Sprint: ${sprint}\n\n` +
+            `Story Point Estimate: ${storyPointEstimate}\n\n` +
+            `Development: ${developement}\n\n` +
+            `Reports: ${reports}\n\n` +
+            `Description: ${description}\n\n` +
+            `Acceptance Criteria: ${acceptance}`
         );
       }
       if (isEditing) {
@@ -438,19 +455,41 @@ export default function RequirementsPage() {
   const handleSaveUserStory = () => {
     // Use regex to extract each section (allow for extra blank lines)
     const titleMatch = userStoryText.match(/Title:\s*([\s\S]*?)\n\nAssignee:/);
-    const assigneeMatch = userStoryText.match(/Assignee:\s*([\s\S]*?)\n\nPriority:/);
-    const priorityMatch = userStoryText.match(/Priority:\s*([\s\S]*?)\n\nParent:/);
-    const parentMatch = userStoryText.match(/Parent:\s*([\s\S]*?)\n\nDue Date:/);
-    const dueDateMatch = userStoryText.match(/Due Date:\s*([\s\S]*?)\n\nLabels:/);
+    const assigneeMatch = userStoryText.match(
+      /Assignee:\s*([\s\S]*?)\n\nPriority:/
+    );
+    const priorityMatch = userStoryText.match(
+      /Priority:\s*([\s\S]*?)\n\nParent:/
+    );
+    const parentMatch = userStoryText.match(
+      /Parent:\s*([\s\S]*?)\n\nDue Date:/
+    );
+    const dueDateMatch = userStoryText.match(
+      /Due Date:\s*([\s\S]*?)\n\nLabels:/
+    );
     const labelsMatch = userStoryText.match(/Labels:\s*([\s\S]*?)\n\nTeam:/);
     const teamMatch = userStoryText.match(/Team:\s*([\s\S]*?)\n\nStart Date:/);
-    const startDateMatch = userStoryText.match(/Start Date:\s*([\s\S]*?)\n\nSprint:/);
-    const sprintMatch = userStoryText.match(/Sprint:\s*([\s\S]*?)\n\nStory Point Estimate:/);
-    const storyPointEstimateMatch = userStoryText.match(/Story Point Estimate:\s*([\s\S]*?)\n\nDevelopment:/);
-    const developementMatch = userStoryText.match(/Development:\s*([\s\S]*?)\n\nReports:/);
-    const reportsMatch = userStoryText.match(/Reports:\s*([\s\S]*?)\n\nDescription:/);
-    const descriptionMatch = userStoryText.match(/Description:\s*([\s\S]*?)\n\nAcceptance Criteria:/);
-    const acceptanceMatch = userStoryText.match(/Acceptance Criteria:\s*([\s\S]*)/);
+    const startDateMatch = userStoryText.match(
+      /Start Date:\s*([\s\S]*?)\n\nSprint:/
+    );
+    const sprintMatch = userStoryText.match(
+      /Sprint:\s*([\s\S]*?)\n\nStory Point Estimate:/
+    );
+    const storyPointEstimateMatch = userStoryText.match(
+      /Story Point Estimate:\s*([\s\S]*?)\n\nDevelopment:/
+    );
+    const developementMatch = userStoryText.match(
+      /Development:\s*([\s\S]*?)\n\nReports:/
+    );
+    const reportsMatch = userStoryText.match(
+      /Reports:\s*([\s\S]*?)\n\nDescription:/
+    );
+    const descriptionMatch = userStoryText.match(
+      /Description:\s*([\s\S]*?)\n\nAcceptance Criteria:/
+    );
+    const acceptanceMatch = userStoryText.match(
+      /Acceptance Criteria:\s*([\s\S]*)/
+    );
     setTitle(titleMatch ? titleMatch[1].trim() : "");
     setAssignee(assigneeMatch ? assigneeMatch[1].trim() : "");
     setPriority(priorityMatch ? priorityMatch[1].trim() : "");
@@ -460,12 +499,17 @@ export default function RequirementsPage() {
     setTeam(teamMatch ? teamMatch[1].trim() : "");
     setStartDate(startDateMatch ? startDateMatch[1].trim() : "");
     setSprint(sprintMatch ? sprintMatch[1].trim() : "");
-    setStoryPointEstimate(storyPointEstimateMatch ? storyPointEstimateMatch[1].trim() : "");
+    setStoryPointEstimate(
+      storyPointEstimateMatch ? storyPointEstimateMatch[1].trim() : ""
+    );
     setDevelopement(developementMatch ? developementMatch[1].trim() : "");
     setReports(reportsMatch ? reportsMatch[1].trim() : "");
     setDescription(descriptionMatch ? descriptionMatch[1].trim() : "");
     setAcceptance(acceptanceMatch ? acceptanceMatch[1].trim() : "");
-    setEditMode((prev) => ({ ...prev, ["User Stories & Acceptance Criteria"]: false }));
+    setEditMode((prev) => ({
+      ...prev,
+      ["User Stories & Acceptance Criteria"]: false,
+    }));
   };
 
   const handleGenerateTest = async () => {
@@ -755,18 +799,32 @@ export default function RequirementsPage() {
                 {/* Content Layout */}
                 <div className="space-y-6">
                   {(error || jiraSuccess) && (
-                    <div className={
-                      error
-                        ? "bg-red-100 text-red-700 p-4 rounded-lg"
-                        : "bg-green-100 text-green-700 p-4 rounded-lg"
-                    }>
-                      {error
-                        ? (typeof error === "object" ? JSON.stringify(error) : error)
-                        : (
-                          <span>
-                            Pushed to Jira: <a href={jiraSuccess.url} target="_blank" rel="noopener noreferrer" className="underline font-bold">{jiraSuccess.id}</a>
-                          </span>
-                        )}
+                    <div
+                      className={
+                        error
+                          ? "bg-red-100 text-red-700 p-4 rounded-lg"
+                          : "bg-green-100 text-green-700 p-4 rounded-lg"
+                      }
+                    >
+                      {error ? (
+                        typeof error === "object" ? (
+                          JSON.stringify(error)
+                        ) : (
+                          error
+                        )
+                      ) : (
+                        <span>
+                          Pushed to Jira:{" "}
+                          <a
+                            href={jiraSuccess.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline font-bold"
+                          >
+                            {jiraSuccess.id}
+                          </a>
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -896,39 +954,121 @@ export default function RequirementsPage() {
                           <div className="bg-red-100 text-red-700 p-4 rounded-lg">
                             {generationErrors[activeGenerationTab]}
                           </div>
-                        ) : activeGenerationTab === "User Stories & Acceptance Criteria" && generationResults[activeGenerationTab] ? (
+                        ) : activeGenerationTab ===
+                            "User Stories & Acceptance Criteria" &&
+                          generationResults[activeGenerationTab] ? (
                           <div className="flex gap-4 mb-2">
                             <div className="flex-1">
                               {editMode[activeGenerationTab] ? (
                                 <textarea
                                   className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 bg-white resize-none"
                                   value={userStoryText}
-                                  onChange={e => setUserStoryText(e.target.value)}
-                                  style={{ backgroundColor: "#fff", minHeight: "24rem" }}
+                                  onChange={(e) =>
+                                    setUserStoryText(e.target.value)
+                                  }
+                                  style={{
+                                    backgroundColor: "#fff",
+                                    minHeight: "24rem",
+                                  }}
                                 />
                               ) : (
                                 <div className="space-y-4">
-                                  <div><strong>Title</strong><br /><span style={{ whiteSpace: 'pre-line' }}>{title}</span></div>
-                                  <div><strong>Assignee:</strong> <span style={{ whiteSpace: 'pre-line' }}>{assignee}</span></div>
-                                  <div><strong>Priority:</strong> <span style={{ whiteSpace: 'pre-line' }}>{priority}</span></div>
-                                  <div><strong>Parent:</strong> <span style={{ whiteSpace: 'pre-line' }}>{parent}</span></div>
-                                  <div><strong>Due Date:</strong> <span style={{ whiteSpace: 'pre-line' }}>{dueDate}</span></div>
-                                  <div><strong>Labels:</strong> <span style={{ whiteSpace: 'pre-line' }}>{labels}</span></div>
-                                  <div><strong>Team:</strong> <span style={{ whiteSpace: 'pre-line' }}>{team}</span></div>
-                                  <div><strong>Start Date:</strong> <span style={{ whiteSpace: 'pre-line' }}>{startDate}</span></div>
-                                  <div><strong>Sprint:</strong> <span style={{ whiteSpace: 'pre-line' }}>{sprint}</span></div>
-                                  <div><strong>Story Point Estimate:</strong> <span style={{ whiteSpace: 'pre-line' }}>{storyPointEstimate}</span></div>
-                                  <div><strong>Development:</strong> <span style={{ whiteSpace: 'pre-line' }}>{developement}</span></div>
-                                  <div><strong>Reports:</strong> <span style={{ whiteSpace: 'pre-line' }}>{reports}</span></div>
-                                  <div><strong>Description</strong><br /><span style={{ whiteSpace: 'pre-line' }}>{description}</span></div>
-                                  <div><strong>Acceptance criteria</strong><br /><span style={{ whiteSpace: 'pre-line' }}>{acceptance}</span></div>
+                                  <div>
+                                    <strong>Title</strong>
+                                    <br />
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {title}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Assignee:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {assignee}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Priority:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {priority}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Parent:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {parent}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Due Date:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {dueDate}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Labels:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {labels}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Team:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {team}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Start Date:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {startDate}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Sprint:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {sprint}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Story Point Estimate:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {storyPointEstimate}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Development:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {developement}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Reports:</strong>{" "}
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {reports}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Description</strong>
+                                    <br />
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {description}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <strong>Acceptance criteria</strong>
+                                    <br />
+                                    <span style={{ whiteSpace: "pre-line" }}>
+                                      {acceptance}
+                                    </span>
+                                  </div>
                                 </div>
                               )}
                             </div>
                             <div className="flex flex-col gap-2 justify-start">
                               <button
                                 className="px-4 py-2 bg-[#0089EB] cursor-pointer text-white rounded-lg hover:bg-[#007acc] text-sm font-medium"
-                                onClick={() => handlePushToJira(activeGenerationTab)}
+                                onClick={() =>
+                                  handlePushToJira(activeGenerationTab)
+                                }
                                 type="button"
                               >
                                 Push to Jira
@@ -947,7 +1087,9 @@ export default function RequirementsPage() {
                                 ) : (
                                   <CiEdit className="w-4 h-4" />
                                 )}
-                                {editMode[activeGenerationTab] ? "Save" : "Edit"}
+                                {editMode[activeGenerationTab]
+                                  ? "Save"
+                                  : "Edit"}
                               </button>
                               <button
                                 className="text-sm font-medium flex items-center cursor-pointer pl-8 gap-x-1 transition-all duration-300 ease-in-out"
@@ -960,17 +1102,27 @@ export default function RequirementsPage() {
                                   <MdContentCopy className="w-4 h-4" />
                                 )}
                                 <span
-                                  className={`transition-all duration-300 ${copiedTab === activeGenerationTab ? "text-green-600" : ""}`}
+                                  className={`transition-all duration-300 ${
+                                    copiedTab === activeGenerationTab
+                                      ? "text-green-600"
+                                      : ""
+                                  }`}
                                 >
-                                  {copiedTab === activeGenerationTab ? "Copied" : "Copy"}
+                                  {copiedTab === activeGenerationTab
+                                    ? "Copied"
+                                    : "Copy"}
                                 </span>
                               </button>
                             </div>
                           </div>
-                        ) : activeGenerationTab === "Test Cases" && generationResults["Test Cases"] ? (
+                        ) : activeGenerationTab === "Test Cases" &&
+                          generationResults["Test Cases"] ? (
                           <div className="flex gap-4 mb-2">
                             <div className="flex-1">
-                              <div className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap" style={{ minHeight: "24rem" }}>
+                              <div
+                                className="w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap"
+                                style={{ minHeight: "24rem" }}
+                              >
                                 {generationResults["Test Cases"]}
                               </div>
                             </div>
@@ -985,21 +1137,37 @@ export default function RequirementsPage() {
                                 ) : (
                                   <MdContentCopy className="w-4 h-4" />
                                 )}
-                                <span className={`transition-all duration-300 ${copiedTab === "Test Cases" ? "text-green-600" : ""}`}>
-                                  {copiedTab === "Test Cases" ? "Copied" : "Copy"}
+                                <span
+                                  className={`transition-all duration-300 ${
+                                    copiedTab === "Test Cases"
+                                      ? "text-green-600"
+                                      : ""
+                                  }`}
+                                >
+                                  {copiedTab === "Test Cases"
+                                    ? "Copied"
+                                    : "Copy"}
                                 </span>
                               </button>
                             </div>
                           </div>
-                        ) : activeGenerationTab === "Automation Scripts" && generationResults["Automation Scripts"] ? (
-                          <div className="relative w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap" style={{ minHeight: "24rem" }}>
+                        ) : activeGenerationTab === "Automation Scripts" &&
+                          generationResults["Automation Scripts"] ? (
+                          <div
+                            className="relative w-full h-96 border border-gray-300 rounded-lg p-4 text-gray-700 overflow-auto whitespace-pre-wrap"
+                            style={{ minHeight: "24rem" }}
+                          >
                             <button
                               className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 hover:text-blue-600 hover:bg-gray-200 text-xs font-medium transition-all"
                               onClick={async () => {
                                 const script =
                                   generationResults["Automation Scripts"] &&
-                                  typeof generationResults["Automation Scripts"] === "object"
-                                    ? generationResults["Automation Scripts"][selectedScriptLanguage] || ""
+                                  typeof generationResults[
+                                    "Automation Scripts"
+                                  ] === "object"
+                                    ? generationResults["Automation Scripts"][
+                                        selectedScriptLanguage
+                                      ] || ""
                                     : "";
                                 if (script) {
                                   await navigator.clipboard.writeText(script);
@@ -1012,7 +1180,8 @@ export default function RequirementsPage() {
                             >
                               {copiedTab === "Automation Scripts" ? (
                                 <>
-                                  <TiTick className="w-4 h-4 text-green-600" /> Copied!
+                                  <TiTick className="w-4 h-4 text-green-600" />{" "}
+                                  Copied!
                                 </>
                               ) : (
                                 <>
@@ -1021,8 +1190,11 @@ export default function RequirementsPage() {
                               )}
                             </button>
                             {generationResults["Automation Scripts"] &&
-                            typeof generationResults["Automation Scripts"] === "object"
-                              ? generationResults["Automation Scripts"][selectedScriptLanguage] || "No script generated for this language."
+                            typeof generationResults["Automation Scripts"] ===
+                              "object"
+                              ? generationResults["Automation Scripts"][
+                                  selectedScriptLanguage
+                                ] || "No script generated for this language."
                               : "No automation scripts generated yet. Click 'Generate test' to create scripts."}
                           </div>
                         ) : (
@@ -1050,16 +1222,18 @@ export default function RequirementsPage() {
       {showJiraConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-md">
           <div className="bg-white rounded-lg shadow-lg p-8 max-w-sm w-full flex flex-col items-center">
-            <div className="text-lg font-semibold mb-4">Are you sure you want to push to Jira?</div>
+            <div className="text-lg font-semibold mb-4">
+              Are you sure you want to push to Jira?
+            </div>
             <div className="flex gap-4 mt-2">
               <button
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 font-medium"
+                className="px-4 py-2 bg-gray-200 rounded cursor-pointer hover:bg-gray-300 font-medium"
                 onClick={() => setShowJiraConfirm(false)}
               >
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-[#0089EB] text-white rounded hover:bg-blue-700 font-medium"
+                className="px-4 py-2 bg-[#0089EB] text-white cursor-pointer rounded hover:bg-blue-700 font-medium"
                 onClick={() => handleConfirmPushToJira(activeGenerationTab)}
               >
                 Yes

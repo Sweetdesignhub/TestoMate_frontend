@@ -174,7 +174,7 @@ export default function NewProjectModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full sm:w-1/2 px-6 py3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                className="w-full sm:w-1/2 px-6 py3 bg-gray-100 cursor-pointer text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
               >
                 Cancel
               </button>
@@ -183,7 +183,7 @@ export default function NewProjectModal({
                 disabled={
                   loading || keyStatus === "exists" || keyStatus === "checking"
                 }
-                className="w-full sm:w-1/2 px-6 py-3 bg-[#EB1700] text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                className="w-full sm:w-1/2 px-6 py-3 bg-[#EB1700] cursor-pointer text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {loading ? (
                   <>

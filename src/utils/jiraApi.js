@@ -5,7 +5,7 @@
 //   parseDescription,
 // } from "./jiraUtils";
 
-// const JIRA_BASE_URL = "http://localhost:3000/api/jira";
+// const JIRA_BASE_URL = "https://testomate-backend.onrender.com/api/jira";
 
 // export const getProjectInfo = async (projectKey) => {
 //   try {
@@ -128,7 +128,7 @@ import {
   parseDescription,
 } from "./jiraUtils";
 
-const JIRA_BASE_URL = "http://localhost:3000/api/jira";
+const JIRA_BASE_URL = "https://testomate-backend.onrender.com/api/jira";
 
 export const getProjectInfo = async (projectKey) => {
   try {

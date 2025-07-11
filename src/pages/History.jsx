@@ -4,12 +4,13 @@ import axios from "axios";
 import Header from "../components/Header";
 import { mainSidebarItems, projectSidebarItems } from "../utils/constants";
 import { Search } from "lucide-react";
+import { getAllProjects } from "../utils/jiraApi";
 
 export default function History() {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeMainTab, setActiveMainTab] = useState("Generative Agent");
-  const [activeSubTab, setActiveSubTab] = useState("History");
+  const [activeSubTab, setActiveSubTab] = useState("Requirements");
   const [projectKey, setProjectKey] = useState(
     location.state?.projectKey || "SCRUM"
   );
@@ -17,6 +18,34 @@ export default function History() {
   const [history, setHistory] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState([]);
+  const [selectedProject, setSelectedProject] = useState("");
+
+  // Fetch projects from Jira
+  useEffect(() => {
+    async function fetchProjects() {
+      try {
+        const allProjects = await getAllProjects();
+        setProjects(allProjects);
+        if (allProjects.length > 0) {
+          const initialProject =
+            allProjects.find((p) => p.key === projectKey) || allProjects[0];
+          setSelectedProject(initialProject.name);
+          setProjectKey(initialProject.key);
+        }
+        setError(null);
+      } catch (error) {
+        setError(
+          error.response?.status === 401
+            ? "Unauthorized: Invalid Jira credentials."
+            : "Failed to fetch projects from Jira."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProjects();
+  }, []);
 
   // Fetch project name based on projectKey
   useEffect(() => {
@@ -24,7 +53,7 @@ export default function History() {
       try {
         if (projectKey !== "Unknown Project") {
           const response = await axios.get(
-            `http://localhost:3000/api/jira/project/${projectKey}`
+            `https://testomate-backend.onrender.com/api/jira/project/${projectKey}`
           );
           setProjectName(response.data.name);
         }
@@ -42,7 +71,7 @@ export default function History() {
     async function fetchHistory() {
       try {
         const response = await axios.get(
-          `http://localhost:3000/api/jira/history/${projectKey}`
+          `https://testomate-backend.onrender.com/api/jira/history/${projectKey}`
         );
         setHistory(response.data);
         setError(null);
@@ -56,6 +85,7 @@ export default function History() {
     fetchHistory();
   }, [projectKey]);
 
+  // Update active sub-tab based on location
   useEffect(() => {
     const foundTab = projectSidebarItems.find(
       (item) => item.path === location.pathname
@@ -139,33 +169,39 @@ export default function History() {
               {/* Filter Layout */}
               <div className="flex items-center justify-between mb-6 w-full h-10">
                 <div className="flex items-center gap-4 w-[621px] h-10">
-                  {/* First Dropdown */}
+                  {/* Project Selection Dropdown */}
                   <div className="relative">
-                    <select className="appearance-none bg-white cursor-pointer outline-none pr-8 pl-3 py-2 w-[200px] h-10 rounded-[5px] border border-[#CBCBCB]">
-                      <option>Healthcare Portal</option>
-                      <option>E-commerce Platform</option>
-                      <option>Banking System</option>
-                      <option>Educational App</option>
-                      <option>Social Media App</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                      <svg
-                        className="w-4 h-4 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                    {loading ? (
+                      <span>Loading projects...</span>
+                    ) : projects.length === 0 ? (
+                      <span>No projects available</span>
+                    ) : (
+                      <select
+                        value={selectedProject}
+                        onChange={(e) => {
+                          setSelectedProject(e.target.value);
+                          const selected = projects.find(
+                            (p) => p.name === e.target.value
+                          );
+                          if (selected) {
+                            setProjectKey(selected.key);
+                            navigate("/history", {
+                              state: { projectKey: selected.key },
+                            });
+                          }
+                        }}
+                        className="px-4 py-2 border border-gray-300 font-medium cursor-pointer rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </div>
+                        {projects.map((project) => (
+                          <option key={project.key} value={project.name}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
-                  {/* Second Dropdown */}
+                  {/* Type Filter Dropdown */}
                   <div className="relative">
                     <select className="appearance-none bg-white cursor-pointer outline-none pr-8 pl-3 py-2 w-[200px] h-10 rounded-[5px] border border-[#CBCBCB]">
                       <option>All Types</option>
