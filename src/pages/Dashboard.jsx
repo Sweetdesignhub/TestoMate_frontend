@@ -85,6 +85,9 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [projectName, setProjectName] = useState(projectKey);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 5; // Customize as needed
+
   useEffect(() => {
     async function fetchProjectName() {
       try {
@@ -259,6 +262,12 @@ export default function Dashboard() {
       setActiveSubTab(foundTab.name);
     }
   }, [location.pathname]);
+
+  const totalPages = Math.ceil(failedTests.length / rowsPerPage);
+  const paginatedTests = failedTests.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
 
   const COLORS = ["#10B981", "#EF4444", "#F59E0B", "#8B5CF6"];
 
@@ -460,7 +469,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 xl:col-span-1">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 xl:col-span-1 h-[450px]">
                   <h3 className="text-lg font-semibold text-gray-900">
                     Execution
                   </h3>
@@ -536,45 +545,45 @@ export default function Dashboard() {
                       View all tests
                     </button>
                   </div>
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <div className="overflow-x-auto">
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-[405px] flex flex-col">
+                    <div className="flex-1 overflow-x-auto">
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-gray-200">
-                            <th className="text-left text-xs font-bold pb-3">
+                            <th className="text-left text-xs font-bold pb-3 pr-4">
                               Test Name
                             </th>
-                            <th className="text-left text-xs font-bold pb-3">
+                            <th className="text-left text-xs font-bold pb-3 px-4">
                               Type
                             </th>
-                            <th className="text-left text-xs font-bold pb-3">
+                            <th className="text-left text-xs font-bold pb-3 px-4">
                               Executed by
                             </th>
-                            <th className="text-left text-xs font-bold pb-3">
+                            <th className="text-left text-xs font-bold pb-3 px-4">
                               Duration
                             </th>
-                            <th className="text-left text-xs font-bold pb-3">
+                            <th className="text-left text-xs font-bold pb-3 pl-4">
                               Date
                             </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {failedTests.length > 0 ? (
-                            failedTests.map((test, index) => (
+                          {paginatedTests.length > 0 ? (
+                            paginatedTests.map((test, index) => (
                               <tr key={index} className="hover:bg-gray-50">
-                                <td className="py-3 text-sm text-[#636363]">
+                                <td className="py-3 text-sm text-[#636363] pr-4">
                                   {test.name}
                                 </td>
-                                <td className="py-3 text-sm text-[#636363]">
+                                <td className="py-3 text-sm text-[#636363] px-4">
                                   {test.type}
                                 </td>
-                                <td className="py-3 text-sm text-[#636363]">
+                                <td className="py-3 text-sm text-[#636363] px-4">
                                   {test.executor}
                                 </td>
-                                <td className="py-3 text-sm text-[#636363]">
+                                <td className="py-3 text-sm text-[#636363] px-4">
                                   {test.duration}
                                 </td>
-                                <td className="py-3 text-sm text-[#636363]">
+                                <td className="py-3 text-sm text-[#636363] pl-4">
                                   {test.date}
                                 </td>
                                 <td className="py-3">
@@ -602,6 +611,43 @@ export default function Dashboard() {
                         </tbody>
                       </table>
                     </div>
+                    {totalPages > 1 && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 flex justify-center space-x-2 text-sm text-gray-700">
+                        <button
+                          disabled={currentPage === 1}
+                          onClick={() =>
+                            setCurrentPage((prev) => Math.max(prev - 1, 1))
+                          }
+                          className="px-3 py-1 border rounded cursor-pointer disabled:opacity-50"
+                        >
+                          Prev
+                        </button>
+                        {[...Array(totalPages)].map((_, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setCurrentPage(idx + 1)}
+                            className={`px-3 py-1 cursor-pointer border rounded ${
+                              currentPage === idx + 1
+                                ? "bg-red-100 text-red-600"
+                                : ""
+                            }`}
+                          >
+                            {idx + 1}
+                          </button>
+                        ))}
+                        <button
+                          disabled={currentPage === totalPages}
+                          onClick={() =>
+                            setCurrentPage((prev) =>
+                              Math.min(prev + 1, totalPages)
+                            )
+                          }
+                          className="px-3 py-1 border rounded cursor-pointer disabled:opacity-50"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
