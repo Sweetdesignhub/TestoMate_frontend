@@ -409,7 +409,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex-1">
                       {executionData.every((d) => d.total === 0) ? (
-                        <div className="text-center text-gray-500 text-sm">
+                        <div className="h-full flex items-center justify-center text-gray-500 text-sm">
                           No execution data available
                         </div>
                       ) : (
@@ -483,34 +483,34 @@ export default function Dashboard() {
                           Test
                         </span>
                       </div>
-                      {chartData.every((d) => d.value === 0) ? (
+                      {/* {chartData.every((d) => d.value === 0) ? (
                         <div className="text-center text-gray-500 text-sm">
                           No test data available
                         </div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={chartData}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={65}
-                              outerRadius={90}
-                              paddingAngle={5}
-                              stroke="none"
-                            >
-                              {chartData.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={COLORS[index % COLORS.length]}
-                                />
-                              ))}
-                            </Pie>
-                          </PieChart>
-                        </ResponsiveContainer>
-                      )}
+                      ) : ( */}
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={chartData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={65}
+                            outerRadius={90}
+                            paddingAngle={5}
+                            stroke="none"
+                          >
+                            {chartData.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={COLORS[index % COLORS.length]}
+                              />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      {/* )} */}
                     </div>
                     <div className="space-y-3">
                       {chartData.map((item, index) => (
@@ -602,7 +602,7 @@ export default function Dashboard() {
                             <tr>
                               <td
                                 colSpan={6}
-                                className="py-3 text-sm text-[#636363] text-center"
+                                className="h-[300px] text-sm text-[#636363] text-center align-middle"
                               >
                                 No failed tests found.
                               </td>
