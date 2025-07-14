@@ -249,8 +249,18 @@ export default function History() {
                         {history.length > 0 ? (
                           history.map((item) => (
                             <tr key={item.id} className="hover:bg-gray-50">
-                              <td className="py-3 text-sm text-[#636363]">
-                                {item.jiraIssueId || "N/A"}
+                              <td className="py-3 text-sm">
+                                {item.jiraIssueId ? (
+                                  <a
+                                    href={`https://sweetdesignhub.atlassian.net/browse/${item.jiraIssueId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    {item.jiraIssueId}
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400">N/A</span>
+                                )}
                               </td>
                               <td className="py-3 text-sm text-[#636363] max-w-xs truncate">
                                 {item.title}
