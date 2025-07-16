@@ -20,6 +20,7 @@ import { BiError } from "react-icons/bi";
 import { FaSpinner } from "react-icons/fa";
 import welcomeImg from "../assets/welcome-img.png";
 import NewProjectModal from "../components/NewProjectModal";
+import SuccessModal from "../components/SuccessModal";
 
 // In-memory cache for project data
 const projectCache = new Map();
@@ -35,6 +36,8 @@ export default function Home() {
     key: "",
     description: "",
   });
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [createdProjectName, setCreatedProjectName] = useState("");
   const navigate = useNavigate();
 
   const sidebarItems = [
@@ -139,6 +142,8 @@ export default function Home() {
       setShowModal(false);
       setNewProject({ name: "", key: "", description: "" });
       setError(null);
+      setCreatedProjectName(fullProjectInfo.name);
+      setShowSuccess(true);
     } catch (error) {
       console.error("Error creating project:", error.message);
       setError(
@@ -256,6 +261,11 @@ export default function Home() {
           </main>
         </div>
       </div>
+      <SuccessModal
+        show={showSuccess}
+        projectName={createdProjectName}
+        onClose={() => setShowSuccess(false)}
+      />
     </div>
   );
 }

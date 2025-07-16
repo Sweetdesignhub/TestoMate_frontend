@@ -474,14 +474,38 @@ export default function RequirementsPage() {
     setEditedResults({}); // Clear previous edits
     setError(null);
     setActiveGenerationTab("User Stories & Acceptance Criteria");
+    
     const filesContent = uploadedFiles.map((f) => f.content).join("\n");
     const requirement = (filesContent ? filesContent + "\n" : "") + prompt;
     console.log("Prompt being sent:", prompt);
-    if (!requirement.trim()) {
-      setError("Please enter a requirement or story ID, or upload a file.");
+  
+    // First validate the prompt
+    try {
+      const validationResponse = await axios.post(
+        "http://localhost:8000/generate_contents",
+        { requirement }
+      );
+  
+      // If the response has an error, stop generation
+      if (validationResponse.data.error) {
+        setError(validationResponse.data.error);
+        setGenerationResults({});
+        setEditedResults({});
+        setGenerationErrors({});
+        setIsGeneratingAll(false);
+        return;
+      }
+    } catch (error) {
+      // Handle validation error
+      setError("Failed to validate prompt. Please try again.");
+      setGenerationResults({});
+      setEditedResults({});
+      setGenerationErrors({});
       setIsGeneratingAll(false);
       return;
     }
+  
+    // Only proceed with generation if prompt validation passed
     const endpoints = {
       "User Stories & Acceptance Criteria": {
         endpoint: "/jira_user_story",
@@ -496,12 +520,14 @@ export default function RequirementsPage() {
         payload: { requirement, languages: scriptLanguages },
       },
     };
+  
     setGenerationLoading({
       "User Stories & Acceptance Criteria": true,
       "Test Cases": true,
       "Automation Scripts": true,
     });
     setGenerationErrors({});
+  
     await Promise.all(
       Object.entries(endpoints).map(async ([tab, { endpoint, payload }]) => {
         try {
@@ -516,7 +542,6 @@ export default function RequirementsPage() {
             }));
             setSelectedScriptLanguage("Python");
             setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
-            setSelectedScriptLanguage("Python");
           } else if (tab === "User Stories & Acceptance Criteria") {
             setTitle(res.data.title || "");
             setDescription(res.data.description || "");
@@ -546,12 +571,14 @@ export default function RequirementsPage() {
           }
           setGenerationErrors((prev) => ({ ...prev, [tab]: undefined }));
         } catch (err) {
+          let backendError =
+            err.response?.data?.error ||
+            err.response?.data?.detail ||
+            err.message ||
+            "Failed to generate result. Please try again.";
           setGenerationErrors((prev) => ({
             ...prev,
-            [tab]:
-              err.response?.data?.detail ||
-              err.message ||
-              "Failed to generate result. Please try again.",
+            [tab]: backendError,
           }));
         } finally {
           setGenerationLoading((prev) => ({ ...prev, [tab]: false }));
