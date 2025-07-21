@@ -526,7 +526,7 @@ export default function RequirementsPage() {
     // First validate the prompt
     try {
       const validationResponse = await axios.post(
-        "http://localhost:8000/generate_contents",
+        "http://20.244.44.70:5001/generate_contents",
         { requirement }
       );
 
@@ -576,7 +576,7 @@ export default function RequirementsPage() {
       Object.entries(endpoints).map(async ([tab, { endpoint, payload }]) => {
         try {
           const res = await axios.post(
-            `http://localhost:8000${endpoint}`,
+            `http://20.244.44.70:5001${endpoint}`,
             payload
           );
           if (tab === "Automation Scripts") {
