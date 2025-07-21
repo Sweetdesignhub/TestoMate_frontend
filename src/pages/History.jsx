@@ -24,7 +24,7 @@ export default function History() {
       try {
         if (projectKey !== "Unknown Project") {
           const response = await axios.get(
-            `http://localhost:3000/api/jira/project/${projectKey}`
+            `https://testomate-backend-bubwewfpd2c4a7a0.southindia-01.azurewebsites.net/api/jira/project/${projectKey}`
           );
           setProjectName(response.data.name);
         }
@@ -42,7 +42,7 @@ export default function History() {
     async function fetchHistory() {
       try {
         const response = await axios.get(
-          `http://localhost:3000/api/jira/history/${projectKey}`
+          `https://testomate-backend-bubwewfpd2c4a7a0.southindia-01.azurewebsites.net/api/jira/history/${projectKey}`
         );
         setHistory(response.data);
         setError(null);
