@@ -512,125 +512,252 @@ export default function RequirementsPage() {
     }));
   };
 
+  // const handleGenerateTest = async () => {
+  //   setIsGeneratingAll(true);
+  //   setGenerationResults({}); // Clear previous results
+  //   setEditedResults({}); // Clear previous edits
+  //   setError(null);
+  //   setActiveGenerationTab("User Stories & Acceptance Criteria");
+
+  //   const filesContent = uploadedFiles.map((f) => f.content).join("\n");
+  //   const requirement = (filesContent ? filesContent + "\n" : "") + prompt;
+  //   console.log("Prompt being sent:", prompt);
+
+  //   // First validate the prompt
+  //   try {
+  //     const validationResponse = await axios.post(
+  //       "https://testomate-python-backend-bgemdxgpgwdccfhb.southindia-01.azurewebsites.net/generate_contents",
+  //       { requirement }
+  //     );
+
+  //     // If the response has an error, stop generation
+  //     if (validationResponse.data.error) {
+  //       setError(validationResponse.data.error);
+  //       setGenerationResults({});
+  //       setEditedResults({});
+  //       setGenerationErrors({});
+  //       setIsGeneratingAll(false);
+  //       return;
+  //     }
+  //   } catch (error) {
+  //     // Handle validation error
+  //     setError("Failed to validate prompt. Please try again.");
+  //     setGenerationResults({});
+  //     setEditedResults({});
+  //     setGenerationErrors({});
+  //     setIsGeneratingAll(false);
+  //     return;
+  //   }
+
+  //   // Only proceed with generation if prompt validation passed
+  //   const endpoints = {
+  //     "User Stories & Acceptance Criteria": {
+  //       endpoint: "/jira_user_story",
+  //       payload: { requirement },
+  //     },
+  //     "Test Cases": {
+  //       endpoint: "/test_cases",
+  //       payload: { requirement },
+  //     },
+  //     "Automation Scripts": {
+  //       endpoint: "/automation_script",
+  //       payload: { requirement, languages: scriptLanguages },
+  //     },
+  //   };
+
+  //   setGenerationLoading({
+  //     "User Stories & Acceptance Criteria": true,
+  //     "Test Cases": true,
+  //     "Automation Scripts": true,
+  //   });
+  //   setGenerationErrors({});
+
+  //   await Promise.all(
+  //     Object.entries(endpoints).map(async ([tab, { endpoint, payload }]) => {
+  //       try {
+  //         const res = await axios.post(
+  //           `https://testomate-python-backend-bgemdxgpgwdccfhb.southindia-01.azurewebsites.net${endpoint}`,
+  //           payload
+  //         );
+  //         if (tab === "Automation Scripts") {
+  //           setGenerationResults((prev) => ({
+  //             ...prev,
+  //             [tab]: res.data.result,
+  //           }));
+  //           setSelectedScriptLanguage("Python");
+  //           setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
+  //         } else if (tab === "User Stories & Acceptance Criteria") {
+  //           setTitle(res.data.title || "");
+  //           setDescription(res.data.description || "");
+  //           setAcceptance(res.data.acceptance_criteria || "");
+  //           setAssignee(res.data.assignee || "");
+  //           setPriority(res.data.priority || "");
+  //           setParent(res.data.parent || "");
+  //           setDueDate(res.data.due_date || "");
+  //           setLabels(res.data.labels || "");
+  //           setTeam(res.data.team || "");
+  //           setStartDate(res.data.start_date || "");
+  //           setSprint(res.data.sprint || "");
+  //           setStoryPointEstimate(res.data.story_point_estimate || "");
+  //           setDevelopement(res.data.developement || "");
+  //           setReports(res.data.reports || "");
+  //           setGenerationResults((prev) => ({
+  //             ...prev,
+  //             [tab]: res.data,
+  //           }));
+  //           setEditedResults((prev) => ({ ...prev, [tab]: res.data }));
+  //         } else {
+  //           setGenerationResults((prev) => ({
+  //             ...prev,
+  //             [tab]: res.data.result,
+  //           }));
+  //           setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
+  //         }
+  //         setGenerationErrors((prev) => ({ ...prev, [tab]: undefined }));
+  //       } catch (err) {
+  //         let backendError =
+  //           err.response?.data?.error ||
+  //           err.response?.data?.detail ||
+  //           err.message ||
+  //           "Failed to generate result. Please try again.";
+  //         setGenerationErrors((prev) => ({
+  //           ...prev,
+  //           [tab]: backendError,
+  //         }));
+  //       } finally {
+  //         setGenerationLoading((prev) => ({ ...prev, [tab]: false }));
+  //       }
+  //     })
+  //   );
+  //   setIsGeneratingAll(false);
+  // };
+
+
   const handleGenerateTest = async () => {
-    setIsGeneratingAll(true);
-    setGenerationResults({}); // Clear previous results
-    setEditedResults({}); // Clear previous edits
-    setError(null);
-    setActiveGenerationTab("User Stories & Acceptance Criteria");
+  setIsGeneratingAll(true);
+  setGenerationResults({}); // Clear previous results
+  setEditedResults({}); // Clear previous edits
+  setError(null);
+  setActiveGenerationTab("User Stories & Acceptance Criteria");
 
-    const filesContent = uploadedFiles.map((f) => f.content).join("\n");
-    const requirement = (filesContent ? filesContent + "\n" : "") + prompt;
-    console.log("Prompt being sent:", prompt);
+  const filesContent = uploadedFiles.map((f) => f.content).join("\n");
+  const requirement = (filesContent ? filesContent + "\n" : "") + prompt;
+  console.log("Prompt being sent:", requirement);
 
-    // First validate the prompt
-    try {
-      const validationResponse = await axios.post(
-        "https://testomate-python-backend-bgemdxgpgwdccfhb.southindia-01.azurewebsites.net/generate_contents",
-        { requirement }
-      );
-
-      // If the response has an error, stop generation
-      if (validationResponse.data.error) {
-        setError(validationResponse.data.error);
-        setGenerationResults({});
-        setEditedResults({});
-        setGenerationErrors({});
-        setIsGeneratingAll(false);
-        return;
+  // First validate the prompt
+  try {
+    const validationResponse = await axios.post(
+      "https://testomate-python-backend-bgemdxgpgwdccfhb.southindia-01.azurewebsites.net/generate_contents",
+      {}, // Empty body, as per API expectation
+      {
+        params: { requirement } // Send requirement as query parameter
       }
-    } catch (error) {
-      // Handle validation error
-      setError("Failed to validate prompt. Please try again.");
+    );
+
+    // If the response has an error, stop generation
+    if (validationResponse.data.error) {
+      setError(validationResponse.data.error);
       setGenerationResults({});
       setEditedResults({});
       setGenerationErrors({});
       setIsGeneratingAll(false);
       return;
     }
-
-    // Only proceed with generation if prompt validation passed
-    const endpoints = {
-      "User Stories & Acceptance Criteria": {
-        endpoint: "/jira_user_story",
-        payload: { requirement },
-      },
-      "Test Cases": {
-        endpoint: "/test_cases",
-        payload: { requirement },
-      },
-      "Automation Scripts": {
-        endpoint: "/automation_script",
-        payload: { requirement, languages: scriptLanguages },
-      },
-    };
-
-    setGenerationLoading({
-      "User Stories & Acceptance Criteria": true,
-      "Test Cases": true,
-      "Automation Scripts": true,
-    });
+  } catch (error) {
+    // Handle validation error
+    const errorMessage =
+      error.response?.data?.detail?.[0]?.msg ||
+      "Failed to validate prompt. Please try again.";
+    setError(errorMessage);
+    setGenerationResults({});
+    setEditedResults({});
     setGenerationErrors({});
-
-    await Promise.all(
-      Object.entries(endpoints).map(async ([tab, { endpoint, payload }]) => {
-        try {
-          const res = await axios.post(
-            `https://testomate-python-backend-bgemdxgpgwdccfhb.southindia-01.azurewebsites.net${endpoint}`,
-            payload
-          );
-          if (tab === "Automation Scripts") {
-            setGenerationResults((prev) => ({
-              ...prev,
-              [tab]: res.data.result,
-            }));
-            setSelectedScriptLanguage("Python");
-            setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
-          } else if (tab === "User Stories & Acceptance Criteria") {
-            setTitle(res.data.title || "");
-            setDescription(res.data.description || "");
-            setAcceptance(res.data.acceptance_criteria || "");
-            setAssignee(res.data.assignee || "");
-            setPriority(res.data.priority || "");
-            setParent(res.data.parent || "");
-            setDueDate(res.data.due_date || "");
-            setLabels(res.data.labels || "");
-            setTeam(res.data.team || "");
-            setStartDate(res.data.start_date || "");
-            setSprint(res.data.sprint || "");
-            setStoryPointEstimate(res.data.story_point_estimate || "");
-            setDevelopement(res.data.developement || "");
-            setReports(res.data.reports || "");
-            setGenerationResults((prev) => ({
-              ...prev,
-              [tab]: res.data,
-            }));
-            setEditedResults((prev) => ({ ...prev, [tab]: res.data }));
-          } else {
-            setGenerationResults((prev) => ({
-              ...prev,
-              [tab]: res.data.result,
-            }));
-            setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
-          }
-          setGenerationErrors((prev) => ({ ...prev, [tab]: undefined }));
-        } catch (err) {
-          let backendError =
-            err.response?.data?.error ||
-            err.response?.data?.detail ||
-            err.message ||
-            "Failed to generate result. Please try again.";
-          setGenerationErrors((prev) => ({
-            ...prev,
-            [tab]: backendError,
-          }));
-        } finally {
-          setGenerationLoading((prev) => ({ ...prev, [tab]: false }));
-        }
-      })
-    );
     setIsGeneratingAll(false);
+    return;
+  }
+
+  // Rest of the function remains unchanged
+  const endpoints = {
+    "User Stories & Acceptance Criteria": {
+      endpoint: "/jira_user_story",
+      payload: { requirement },
+    },
+    "Test Cases": {
+      endpoint: "/test_cases",
+      payload: { requirement },
+    },
+    "Automation Scripts": {
+      endpoint: "/automation_script",
+      payload: { requirement, languages: scriptLanguages },
+    },
   };
+
+  setGenerationLoading({
+    "User Stories & Acceptance Criteria": true,
+    "Test Cases": true,
+    "Automation Scripts": true,
+  });
+  setGenerationErrors({});
+
+  await Promise.all(
+    Object.entries(endpoints).map(async ([tab, { endpoint, payload }]) => {
+      try {
+        const res = await axios.post(
+          `https://testomate-python-backend-bgemdxgpgwdccfhb.southindia-01.azurewebsites.net${endpoint}`,
+          payload
+        );
+        if (tab === "Automation Scripts") {
+          setGenerationResults((prev) => ({
+            ...prev,
+            [tab]: res.data.result,
+          }));
+          setSelectedScriptLanguage("Python");
+          setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
+        } else if (tab === "User Stories & Acceptance Criteria") {
+          setTitle(res.data.title || "");
+          setDescription(res.data.description || "");
+          setAcceptance(res.data.acceptance_criteria || "");
+          setAssignee(res.data.assignee || "");
+          setPriority(res.data.priority || "");
+          setParent(res.data.parent || "");
+          setDueDate(res.data.due_date || "");
+          setLabels(res.data.labels || "");
+          setTeam(res.data.team || "");
+          setStartDate(res.data.start_date || "");
+          setSprint(res.data.sprint || "");
+          setStoryPointEstimate(res.data.story_point_estimate || "");
+          setDevelopement(res.data.developement || "");
+          setReports(res.data.reports || "");
+          setGenerationResults((prev) => ({
+            ...prev,
+            [tab]: res.data,
+          }));
+          setEditedResults((prev) => ({ ...prev, [tab]: res.data }));
+        } else {
+          setGenerationResults((prev) => ({
+            ...prev,
+            [tab]: res.data.result,
+          }));
+          setEditedResults((prev) => ({ ...prev, [tab]: res.data.result }));
+        }
+        setGenerationErrors((prev) => ({ ...prev, [tab]: undefined }));
+      } catch (err) {
+        let backendError =
+          err.response?.data?.error ||
+          err.response?.data?.detail ||
+          err.message ||
+          "Failed to generate result. Please try again.";
+        setGenerationErrors((prev) => ({
+          ...prev,
+          [tab]: backendError,
+        }));
+      } finally {
+        setGenerationLoading((prev) => ({ ...prev, [tab]: false }));
+      }
+    })
+  );
+  setIsGeneratingAll(false);
+};
 
   const handlePromptChange = (e) => {
     setPrompt(e.target.value);
