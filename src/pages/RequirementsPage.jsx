@@ -526,7 +526,7 @@ export default function RequirementsPage() {
     // First validate the prompt
     try {
       const validationResponse = await axios.post(
-        "http://20.244.44.70:5001/generate_contents",
+        "https://testomate-python-backend-bgemdxgpgwdccfhb.southindia-01.azurewebsites.net/generate_contents",
         { requirement }
       );
 
