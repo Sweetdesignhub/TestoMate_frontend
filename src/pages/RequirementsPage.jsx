@@ -576,7 +576,7 @@ export default function RequirementsPage() {
       Object.entries(endpoints).map(async ([tab, { endpoint, payload }]) => {
         try {
           const res = await axios.post(
-            `http://20.244.44.70:5001${endpoint}`,
+            `https://testomate-python-backend-bgemdxgpgwdccfhb.southindia-01.azurewebsites.net${endpoint}`,
             payload
           );
           if (tab === "Automation Scripts") {
